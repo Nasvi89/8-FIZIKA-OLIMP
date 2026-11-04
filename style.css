@@ -689,3 +689,98 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .mystat-hw-count b{color:var(--primary)}
 .mystat-course{display:flex;flex-direction:column;gap:8px;margin-top:10px}
 .olimp-class-sub{font-size:12px}
+
+/* ================= Мобильная адаптация (телефоны) ================= */
+@media(max-width:640px){
+  html,body{overflow-x:hidden}
+  .app{flex-direction:column;min-height:100vh}
+  /* Шапка-бар: логотип + скроллируемое меню горизонтально */
+  .sidebar{position:sticky;top:0;z-index:60;display:flex;flex-direction:column;width:100%;height:auto;padding:8px 8px 6px;gap:0}
+  .brand{width:100%;padding:4px 6px 8px}
+  .brand-sub{display:block;font-size:11px}
+  .nav{width:100%;flex-direction:row;flex-wrap:nowrap;overflow-x:auto;gap:6px;margin:0;padding-bottom:6px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .nav::-webkit-scrollbar{display:none}
+  .nav-btn{white-space:nowrap;padding:10px 14px;font-size:14px;flex:none}
+  .nav-help{white-space:nowrap;padding:10px 14px;font-size:13px;flex:none;margin-top:0}
+  .sidebar-foot{display:block;width:100%;text-align:center;padding:6px 4px;border-top:1px solid rgba(255,255,255,.1);margin-top:4px}
+
+  /* Контент */
+  .main{padding:16px 12px 40px;max-width:100%}
+  .view-head h2{font-size:20px}
+  .view-head-row{flex-direction:column;align-items:stretch;gap:12px}
+  .head-actions{width:100%}
+  .head-actions .btn{flex:1}
+
+  /* Герой-блок */
+  .hero{padding:22px 18px;border-radius:16px}
+  .hero h1{font-size:25px}
+  .hero-sub{font-size:14px}
+  .hero-actions{flex-direction:column;width:100%}
+  .hero-actions .btn{width:100%;text-align:center}
+  .hero-badges{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:22px}
+  .stat{padding:8px 6px}
+
+  /* Панели и сетки в одну колонку */
+  .panel{padding:16px 14px}
+  .dash-row{grid-template-columns:1fr}
+  .module-grid{grid-template-columns:1fr;gap:12px}
+  .ach-grid{grid-template-columns:repeat(2,1fr);gap:10px}
+  .cl-tabs{grid-template-columns:1fr 1fr;gap:10px}
+  .cl-subtabs{grid-template-columns:1fr 1fr}
+  .meeting-layout{grid-template-columns:1fr}
+
+  /* Кнопки крупнее для тача */
+  .btn{padding:11px 15px;font-size:15px}
+  .btn-sm{padding:8px 12px;font-size:13px}
+  .module-workspace{padding:16px 12px}
+  .mod-head{flex-wrap:wrap;gap:10px}
+  .mod-head .mh-state{margin-left:0}
+
+  /* Карточки тем */
+  .subs-grid{grid-template-columns:1fr;gap:10px}
+  .sc-name{font-size:16px}
+  .sub-card{padding:14px}
+
+  /* Задачи */
+  .wtask,.btask,.ol-task,.ckwork{padding:13px 12px}
+  .wt-q,.bt-q{font-size:14.5px;line-height:1.45}
+  .solve-actions,.bt-btnrow{flex-direction:column;align-items:stretch}
+  .solve-actions .btn,.bt-btnrow .btn{width:100%}
+
+  /* Таблицы: гарантированный горизонтальный скролл */
+  .olimp-scroll,.astat-table-wrap{margin:0 -4px;border-radius:10px;-webkit-overflow-scrolling:touch}
+  .olimp-table,.astat-table{min-width:640px}
+
+  /* Модалки и тосты */
+  .modal-box{max-height:96vh;border-radius:14px}
+  .modal-body{padding:14px}
+  .toast{left:12px;right:12px;transform:none;bottom:18px;width:auto;text-align:center}
+
+  /* Конспекты и формулы: перенос */
+  .lesson-conspect{padding:14px 12px}
+  .conspect-body{font-size:14.5px;line-height:1.5}
+  .conspect-body table{display:block;overflow-x:auto;white-space:nowrap}
+  .katex-display{overflow-x:auto;overflow-y:hidden;padding:4px 0}
+
+  /* Фильтры и управление */
+  .bank-filters,.control-actions,.pattern-row{flex-direction:column;align-items:stretch}
+  .filter-select{max-width:100%;width:100%}
+  .pattern-row{flex-wrap:nowrap}
+  .bank-summary{display:grid;grid-template-columns:1fr 1fr}
+  .bs-block{min-width:0}
+  .control-actions .filter-select{width:100%}
+
+  /* Форма входа / профиль: не вылезает за край */
+  .profile-body{width:100%;max-width:100%;min-width:0}
+  .profile-card{width:100%;padding:16px;min-width:0}
+  .profile-row input,.form-row input,.form-row select,.form-row textarea,.solve-ans input,.btask .bt-ans input,.wtask .wt-input input{width:100%;box-sizing:border-box;max-width:100%}
+  .form-actions{flex-wrap:wrap}
+  /* Страховка: перенос длинного текста, ничего не торчит за экран */
+  .view p,.view-head p,.profile-banner,.note,.muted,.lv-s,.mt-desc,.sc-desc{overflow-wrap:break-word;word-break:break-word}
+  .view{max-width:100%}
+  .profile-banner{box-sizing:border-box}
+  /* Жёсткое устранение переполнения по ширине */
+  .main,.view,.view-head,.view-head-row,.profile-card,.profile-row,.panel{min-width:0;max-width:100%;width:100%}
+  .view-head p{width:100%;overflow-wrap:anywhere}
+  .main{overflow-x:clip}
+}
