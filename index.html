@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Физика.Олимп 8 класс — блочная олимпиадная подготовка</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="katex/katex.min.css">
+</head>
+<body>
+<div class="app" id="app">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-icon">Ω</div>
+      <div>
+        <div class="brand-title">Физика.Олимп</div>
+        <div class="brand-sub">8 класс · блочная подготовка</div>
+      </div>
+    </div>
+    <nav class="nav">
+      <button class="nav-btn" data-view="dashboard">Траектория</button>
+      <button class="nav-btn" data-view="modules">Блоки</button>
+      <button class="nav-btn" data-view="meeting" id="meeting-nav-btn">Блок с преподавателем</button>
+      <button class="nav-btn" data-view="bank">Банк задач</button>
+      <button class="nav-btn" data-view="olympiad" id="olympiad-nav-btn" style="display:none">Пробная олимпиада</button>
+      <button class="nav-btn" data-view="classes" id="classes-nav-btn" style="display:none">Классы</button>
+      <button class="nav-btn" data-view="mystats" id="mystats-nav-btn" style="display:none">Моя статистика</button>
+      <button class="nav-btn" data-view="achievements">Достижения</button>
+      <button class="nav-btn" data-view="profile">Кабинет</button>
+      <button class="nav-help" id="nav-help-question">❓ Как пользоваться платформой</button>
+    </nav>
+    <div class="sidebar-foot" id="sb-user">Региональный центр «Спутник»</div>
+  </aside>
+
+  <main class="main" id="main">
+
+    <!-- ТРАЕКТОРИЯ -->
+    <section class="view active" id="view-dashboard">
+      <div class="hero">
+        <div class="hero-inner">
+          <span class="hero-tag">Олимпиадная физика · 8 класс</span>
+          <h1>Твой трек <span class="accent">к олимпиадам</span></h1>
+          <p class="hero-sub" id="hero-sub">Блочная дистанционная подготовка: видеокурс, теория, задачи и достижения.</p>
+          <div class="hero-actions">
+            <button class="btn btn-primary" data-view-btn="modules">Открыть блоки</button>
+            <button class="btn btn-ghost" data-view-btn="bank">Банк задач</button>
+          </div>
+        </div>
+        <div class="hero-badges">
+          <div class="stat"><b id="dash-xp">0</b><span>очков опыта</span></div>
+          <div class="stat"><b id="dash-lvl">Обуч.</b><span>уровень трека</span></div>
+          <div class="stat"><b id="dash-modules">0/12</b><span>блоков</span></div>
+          <div class="stat"><b id="dash-ach">0</b><span>достижений</span></div>
+        </div>
+      </div>
+
+      <!-- МИНИ-КАРТА -->
+      <div class="panel">
+        <h3>Карта олимпиадного трека</h3>
+        <p class="muted" style="font-size:13px;margin-bottom:12px">Где ты сейчас. Зелёные — пройдены, оранжевый — текущий, серые — впереди.</p>
+        <div id="minimap" class="minimap"></div>
+      </div>
+
+      <div class="dash-row">
+        <div class="panel skill-panel">
+          <h3>Кольца навыков</h3>
+          <p class="muted" style="font-size:13px;margin-bottom:12px">Пять компетенций олимпиадника. Заполнение растёт от задач.</p>
+          <div id="skill-rings"></div>
+        </div>
+        <div class="panel mastery-panel">
+          <h3>Мастерство по блокам</h3>
+          <p class="muted" style="font-size:13px;margin-bottom:12px">100% — блок зачтён.</p>
+          <div id="dash-mastery"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>📄 Домашнее задание</h3>
+        <div id="dash-homework" class="dash-homework"></div>
+      </div>
+
+      <div class="panel">
+        <h3>Последние достижения</h3>
+        <div id="dash-ach-list" class="dash-ach-list"></div>
+      </div>
+    </section>
+
+    <!-- МОДУЛИ (сетка прямоугольников) -->
+    <section class="view" id="view-modules">
+      <div class="view-head-row">
+        <div class="view-head">
+          <h2>Олимпиадные блоки</h2>
+          <p class="muted">Каждый блок: видеокурс с конспектом → задачи → автопроверка. Следующий открывается после «зачёта».</p>
+        </div>
+        <div class="head-actions">
+          <button class="btn" id="module-reset" title="Сбросить прогресс трека">Сбросить прогресс</button>
+        </div>
+      </div>
+      <div id="module-grid"></div>
+    </section>
+
+    <!-- РАБОЧАЯ ОБЛАСТЬ МОДУЛЯ -->
+    <section class="view" id="view-module">
+      <div class="module-workspace">
+        <button class="btn btn-sm" id="mod-back">← Ко всем блокам</button>
+        <div id="mod-head" class="mod-head"></div>
+        <!-- ЭТАП 1: ВИДЕОУРОК -->
+        <div id="mod-lesson" class="mod-lesson"></div>
+        <!-- ЭТАП 2: ЗАДАЧИ -->
+        <div id="mod-tasks" class="mod-tasks"></div>
+      </div>
+    </section>
+
+    <!-- МОДУЛЬ С ПРЕПОДАВАТЕЛЕМ -->
+    <section class="view" id="view-meeting">
+      <div class="view-head">
+        <h2>Блок с преподавателем</h2>
+        <p class="muted">Звонок (телемост), интерактивная доска и учебные материалы — всё связано с текущей темой.</p>
+      </div>
+
+      <div class="meeting-layout">
+
+        <!-- ЛЕВАЯ КОЛОНКА: созвон + доска -->
+        <div class="meeting-left">
+          <div class="panel">
+            <h3>📞 Созвон с преподавателем</h3>
+            <p class="muted" style="font-size:13px;margin-bottom:10px">Открой звонок в телемосте, а ниже используй интерактивную доску.</p>
+            <div class="telemost-box">
+              <div class="telemost-hero">
+                <div class="th-icon">📹</div>
+                <div class="th-title">Звонок в Яндекс.Телемосте</div>
+                <div class="th-sub">Яндекс.Телемост не позволяет встраивать звонок в страницу, поэтому он открывается в отдельной вкладке.</div>
+                <a class="btn btn-primary btn-lg" href="https://telemost.yandex.ru/j/64857306460563" target="_blank" rel="noopener">🔔 Открыть звонок</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel" id="main-board-panel">
+            <div class="bb-head">
+              <div>
+                <h3>🎨 Интерактивная доска</h3>
+                <div class="muted" style="font-size:12.5px" id="bb-head-sub">Лист 1</div>
+              </div>
+              <div class="bb-actions">
+                <button class="btn btn-sm bb-btn" id="bb-invert" title="Инвертировать доску (белая/тёмная)">🌗 Инверт</button>
+                <button class="btn btn-sm bb-btn" id="bb-save">💾 Сохранить доску</button>
+              </div>
+            </div>
+
+            <!-- Панель инструментов -->
+            <div class="bb-toolbar">
+              <button class="bb-tool active" data-tool="pen" title="Рисовать">✏️</button>
+              <button class="bb-tool" data-tool="eraser" title="Стирать">🧽</button>
+              <button class="bb-tool" data-tool="rect" title="Прямоугольник">▭</button>
+              <button class="bb-tool" data-tool="ellipse" title="Овал">◯</button>
+              <button class="bb-tool" data-tool="line" title="Линия">╱</button>
+              <button class="bb-tool" data-tool="select" title="Выбрать картинку">🖼</button>
+              <span class="bb-sep"></span>
+              <button class="bb-tool" id="bb-addimg" title="Добавить картинку">➕🖼</button>
+              <span class="bb-sep"></span>
+              <input type="color" id="bb-color" value="#1c2340" title="Цвет маркера">
+              <span class="bb-color-val" id="bb-color-val">#1c2340</span>
+              <span class="bb-sep"></span>
+              <button class="bb-tool" id="bb-new" title="Новый лист">📄</button>
+              <button class="bb-tool" id="bb-undo" title="Отменить">↩️</button>
+              <button class="bb-tool" id="bb-clear" title="Очистить лист">🗑</button>
+              <input type="file" id="bb-imgfile" accept="image/*" hidden>
+            </div>
+
+            <!-- Листы -->
+            <div class="bb-sheets" id="bb-sheets"></div>
+
+            <!-- Холст -->
+            <div class="bb-canvas-wrap">
+              <canvas id="bb-canvas" width="1200" height="700"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- ПРАВАЯ КОЛОНКА: учебные материалы -->
+        <div class="meeting-right">
+          <div class="panel">
+            <h3>📚 Учебные материалы</h3>
+            <p class="muted" style="font-size:13px;margin-bottom:10px">Конспекты, листы и сохранённые доски по теме.</p>
+            <div id="mmaterials-list" class="materials-list"></div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- БАНК ЗАДАЧ -->
+    <section class="view" id="view-bank">
+      <div class="view-head-row">
+        <div class="view-head">
+          <h2>Банк олимпиадных задач</h2>
+          <p class="muted">Решай задачи без подсказки, зарабатывай опыт. Ответы не показываются заранее.</p>
+        </div>
+        <div class="head-actions">
+          <button class="btn btn-primary" id="bank-add">+ Добавить задачу</button>
+        </div>
+      </div>
+
+      <div class="bank-summary">
+        <div class="bs-block"><b id="statBase">0</b><span>База</span></div>
+        <div class="bs-block"><b id="statActive">0</b><span>Актив</span></div>
+        <div class="bs-block"><b id="statOlimp">0</b><span>Олимп</span></div>
+        <div class="bs-block total"><b id="statSolved">0</b><span>решено верно</span></div>
+      </div>
+
+      <div class="bank-filters">
+        <span>Блок:</span>
+        <select id="bank-module-filter" class="filter-select">
+          <option value="all">Все блоки</option>
+        </select>
+        <span class="fsep">Уровень:</span>
+        <button class="chip active" data-lvla="all">Все</button>
+        <button class="chip" data-lvla="base">База</button>
+        <button class="chip" data-lvla="active">Актив</button>
+        <button class="chip" data-lvla="olimp">Олимп</button>
+      </div>
+      <div id="bank-list"></div>
+    </section>
+
+    <!-- ПРОБНАЯ ОЛИМПИАДА -->
+    <section class="view" id="view-olympiad">
+      <div class="view-head">
+        <h2>Пробная олимпиада</h2>
+        <p class="muted">Полноформатный письменный тур в формате ВсОШ. Собери набор, скачай листы, реши и разбери ошибки.</p>
+      </div>
+      <div class="pattern-card">
+        <h3>Формат тура</h3>
+        <div class="pattern-row"><span class="p-badge bO">Задачи 1–5</span><span>5 задач · по 5–7 баллов · письменное решение</span></div>
+        <div class="pattern-row scored"><span>Всего</span><span>макс. 30 баллов · 3 часа</span></div>
+      </div>
+      <div class="olymp-actions">
+        <div class="kr-material">
+          <label>Брать задачи из блоков</label>
+          <select id="olymp-modules" multiple size="4"></select>
+          <span class="muted" style="font-size:12px">Ctrl/Cmd — выбрать несколько</span>
+        </div>
+        <button class="btn btn-primary" id="olymp-gen">Собрать тур (5 задач)</button>
+        <button class="btn" id="olymp-dl-txt" disabled>Скачать лист (txt)</button>
+      </div>
+      <div id="olymp-output"></div>
+    </section>
+
+    <!-- КЛАССЫ (учитель/админ) -->
+    <section class="view" id="view-classes">
+      <div class="view-head-row">
+        <div class="view-head">
+          <h2>Классы</h2>
+          <p class="muted">Выбери класс или создай новый. Внутри — олимпиады, контрольные работы и статистика класса.</p>
+        </div>
+        <div class="head-actions">
+          <button class="btn btn-primary" id="classes-add-btn">+ Создать класс</button>
+        </div>
+      </div>
+      <div id="classes-body"></div>
+    </section>
+
+    <!-- Подвкладка КЛАССА: олимпиады / КР / статистика -->
+    <section class="view" id="view-class">
+      <div class="cl-topbar">
+        <button class="btn btn-sm" id="cl-back">← Ко всем классам</button>
+        <div>
+          <h2 id="cl-title"></h2>
+          <div class="muted" id="cl-sub" style="font-size:13px"></div>
+        </div>
+        <button class="btn btn-sm btn-ghost" id="cl-edit">Состав класса</button>
+        <button class="btn btn-sm btn-danger" id="cl-del" style="background:#fdecea;color:#c0392b;border:1px solid #f3b7b0">🗑 Удалить класс</button>
+      </div>
+      <div id="cl-body" class="cl-body"></div>
+    </section>
+
+    <!-- МОЯ СТАТИСТИКА (ученик) -->
+    <section class="view" id="view-mystats">
+      <div class="view-head">
+        <h2>Моя статистика</h2>
+        <p class="muted">Твои результаты: олимпиады РСОШ, домашние задания и выполнение курса.</p>
+      </div>
+      <div id="mystats-body"></div>
+    </section>
+
+    <!-- ДОСТИЖЕНИЯ -->
+    <section class="view" id="view-achievements">
+      <div class="view-head-row">
+        <div class="view-head">
+          <h2>Достижения</h2>
+          <p class="muted">Бейджи за успехи в треке. Открываются автоматически.</p>
+        </div>
+        <div class="head-actions">
+          <button class="btn" id="ach-export">Экспорт</button>
+          <button class="btn" id="ach-import">Импорт</button>
+        </div>
+      </div>
+      <div id="ach-grid" class="ach-grid"></div>
+      <input type="file" id="ach-file" accept=".json" hidden>
+    </section>
+
+    <!-- ЛИЧНЫЙ КАБИНЕТ -->
+    <section class="view" id="view-profile">
+      <div class="view-head">
+        <h2>Личный кабинет</h2>
+        <p class="muted">Профиль ученика. Данные хранятся локально в браузере.</p>
+      </div>
+      <div id="profile-body" class="profile-body"></div>
+    </section>
+
+    <!-- МОДАЛКА ТЕОРИИ -->
+    <div class="modal" id="theory-modal" hidden>
+      <div class="modal-box theory-box">
+        <div class="modal-head">
+          <div><span class="lesson-no" id="th-no"></span><h3 id="th-title"></h3><span class="lm-type" id="th-type"></span></div>
+          <button class="modal-close" id="th-close">&times;</button>
+        </div>
+        <div class="modal-body" id="th-body"></div>
+      </div>
+    </div>
+
+    <!-- МОДАЛКА ДОБАВЛЕНИЯ ЗАДАЧИ -->
+    <div class="modal" id="task-modal" hidden>
+      <div class="modal-box">
+        <div class="modal-head"><h3>Добавить задачу в банк</h3><button class="modal-close" id="tm-close">&times;</button></div>
+        <div class="modal-body">
+          <form id="task-form">
+            <div class="form-row"><label>Блок</label><select id="tf-module"></select></div>
+            <div class="form-row"><label>Уровень</label><select id="tf-level"><option value="base">База</option><option value="active" selected>Актив</option><option value="olimp">Олимп</option></select></div>
+            <div class="form-row"><label>Тип</label><select id="tf-type"><option value="calc">Расчётная</option><option value="test">Тест</option><option value="expert">Экспертная</option><option value="experiment">Эксперимент</option></select></div>
+            <div class="form-row"><label>Условие</label><textarea id="tf-text" rows="3"></textarea></div>
+            <div class="form-row" id="options-row" hidden><label>Варианты ответа (через «;»)</label><input id="tf-options"></div>
+            <div class="form-row"><label>Ответ</label><input id="tf-answer"></div>
+            <div class="form-row"><label>Решение</label><textarea id="tf-solution" rows="3"></textarea></div>
+            <div class="form-actions"><button type="button" class="btn" id="tm-cancel">Отмена</button><button type="submit" class="btn btn-primary">Сохранить</button></div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- МОДАЛКА ОНБОРДИНГА / "КАК ПОЛЬЗОВАТЬСЯ" -->
+    <div class="modal" id="onboard-modal" hidden>
+      <div class="modal-box onboard-box">
+        <div class="modal-head">
+          <div><span class="lesson-no">Добро пожаловать</span><h3>Как пользоваться платформой</h3></div>
+          <button class="modal-close" id="ob-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="onboard-steps">
+            <div class="ob-step"><div class="ob-icon">1️⃣</div><div class="ob-body"><b>Получи доступ</b><span>Логин и пароль выдаёт администратор. Открой вкладку «Кабинет» и войди — прогресс будет сохраняться.</span></div></div>
+            <div class="ob-step"><div class="ob-icon">2️⃣</div><div class="ob-body"><b>Проходи блоки</b><span>В «Блоках» открой первый. Смотри видеоурок и конспект, потом жми «К задачам».</span></div></div>
+            <div class="ob-step"><div class="ob-icon">3️⃣</div><div class="ob-body"><b>Решай и проверяй</b><span>Введи ответ на каждую задачу и нажми «Отправить задачи» — верное подсветится зелёным, ошибка красным.</span></div></div>
+            <div class="ob-step"><div class="ob-icon">4️⃣</div><div class="ob-body"><b>Прокачивай блок до 100%</b><span>Открой следующий блок, когда предыдущий зачтён. Следи за картой в «Траектории».</span></div></div>
+            <div class="ob-step"><div class="ob-icon">5️⃣</div><div class="ob-body"><b>Тренируйся в банке</b><span>В «Банке задач» решай отдельные задачи без подсказок — ответ появится только после ввода.</span></div></div>
+            <div class="ob-step"><div class="ob-icon">6️⃣</div><div class="ob-body"><b>Собери пробный тур</b><span>Раздел «Пробная олимпиада» — полноформатный письменный тур в формате ВсОШ.</span></div></div>
+            <div class="ob-step"><div class="ob-icon">7️⃣</div><div class="ob-body"><b>Следи за достижениями</b><span>Бейджи и очки опыта открываются автоматически за твои успехи.</span></div></div>
+          </div>
+          <div class="form-actions" style="margin-top:18px">
+            <button class="btn" id="ob-skip">Понятно</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="Каталог - Модули/data.js"></script>
+<script src="Каталог - Теория/theory.js"></script>
+<script src="Каталог - Видеоуроки/lessons.js"></script>
+<script src="Каталог - Банк олимпиадных задач/bank.js"></script>
+<script src="Каталог - Банк олимпиадных задач/bank-extra.js"></script>
+<script src="Каталог - Сервер/xlsx.js"></script>
+<script src="pdfkit/pdf-lib.bundle.js"></script>
+<script src="pdfkit/fontkit.js"></script>
+<script src="pdfkit/fizika8-font.js"></script>
+<script src="pdfkit/pdf-gen.js"></script>
+<script src="katex/katex.min.js"></script>
+<script src="katex/auto-render.min.js"></script>
+<script src="db-config.js"></script>
+<script src="db.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

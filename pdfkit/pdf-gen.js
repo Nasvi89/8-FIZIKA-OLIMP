@@ -1,0 +1,218 @@
+/* Генерация PDF в «Физика.Олимп» (pdf-lib + DejaVu Sans, кириллица).
+   Функции: PDF-листовка контрольной работы (2 варианта), PDF банка задач,
+   PDF статистики класса. Всё — настоящий PDF, не печать. */
+(function(){
+if(window.__OLYMP_PDFGEN) return; window.__OLYMP_PDFGEN=true;
+
+function base64ToBytes(b64){
+  var bin=atob(b64), len=bin.length, bytes=new Uint8Array(len);
+  for(var i=0;i<len;i++) bytes[i]=bin.charCodeAt(i);
+  return bytes;
+}
+function esc(s){ return String(s==null?"":s); }
+window.__downloadPdfBytes=function(bytes, name){
+  var blob=new Blob([bytes],{type:"application/pdf"});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement("a");
+  a.href=url; a.download=name;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); },500);
+};
+
+/* Общая подготовка doc+font */
+function pdfDoc(){
+  return window.PDFLib.PDFDocument.create().then(function(doc){
+    if(window.__FONTKIT) doc.registerFontkit(window.__FONTKIT);
+    return doc.embedFont(base64ToBytes(window.FIZIKA8_FONT_B64)).then(function(font){ return {doc:doc,font:font,PDFLib:window.PDFLib,A4:window.PDFLib.PageSizes.A4,rgb:window.PDFLib.rgb}; });
+  });
+}
+function wrapText(font, text, maxW, size){
+  var words=String(text==null?"":text).split(/\s+/), lines=[], cur="";
+  var fits=function(t){ return font.widthOfTextAtSize(t,size)<=maxW; };
+  words.forEach(function(w){
+    var probe=cur?(cur+" "+w):w;
+    if(cur && !fits(probe)){ lines.push(cur); cur=w; } else cur=probe;
+  });
+  if(cur) lines.push(cur);
+  var out=[];
+  lines.forEach(function(l){
+    while(l && font.widthOfTextAtSize(l,size)>maxW){
+      var avg=font.widthOfTextAtSize(l,size)/l.length;
+      var cut=Math.max(3,Math.floor(maxW/avg));
+      out.push(l.slice(0,cut)); l=l.slice(cut);
+    }
+    if(l) out.push(l);
+  });
+  return out;
+}
+
+/* ============ PDF: контрольная работа (2 варианта, один = страница A4) ============ */
+window.OLYMP_buildControlPdf=function(opts){
+  // opts: { v1:{A,B,C}, v2:{A,B,C}, theme, fileName }
+  return pdfDoc().then(function(ctx){
+    var doc=ctx.doc, font=ctx.font, W=595.28, H=841.89, M=42, cw=W-2*M;
+    var rgb=ctx.rgb, ink=rgb(0.12,0.15,0.28), inkSoft=rgb(0.32,0.36,0.55), accent=rgb(0.27,0.42,0.88), line=rgb(0.80,0.83,0.91), band=rgb(0.95,0.96,0.995);
+    function wrap(text,size){ return wrapText(font,text,cw,size); }
+    [[opts.v1,"Вариант 1"],[opts.v2,"Вариант 2"]].forEach(function(pair){
+      var V=pair[0], label=pair[1];
+      var page=doc.addPage(ctx.A4); var y=H-40;
+      function t(s,x,size,color,gap){ page.drawText(esc(s),{x:x,y:y,size:size,color:color||ink,font:font}); y-=(gap!==undefined?gap:(size+4)); }
+      function center(s,size,color,gap){ var w=font.widthOfTextAtSize(esc(s),size); t(s,W/2-w/2,size,color,gap); }
+      page.drawRectangle({x:0,y:H-70,width:W,height:70,color:band});
+      page.drawLine({start:{x:0,y:H-70},end:{x:W,y:H-70},thickness:2,color:accent});
+      y=H-38;
+      var head="Контрольная работа \u00AB"+(opts.theme||"физика \u2014 8 класс")+"\u00BB";
+      var hsize = font.widthOfTextAtSize(head,14)>cw ? 11.5 : 14;
+      wrap(head,hsize).forEach(function(ln){ center(ln,hsize,ink,18); });
+      y-=1;
+      wrap("Блок A (задания 1\u20136) \u2013 база \u00B71 балл; блок B (7\u20139) \u2013 актив \u00B72; блок C (10\u201311) \u2013 олимп \u00B73.",9.5).forEach(function(ln){ center(ln,9.5,inkSoft,13); });
+      y-=4;
+      page.drawLine({start:{x:M,y:y},end:{x:M+cw,y:y},thickness:1,color:line});
+      y-=14;
+      var bw=font.widthOfTextAtSize(label,12)+30;
+      page.drawRectangle({x:W/2-bw/2,y:y-3,width:bw,height:20,color:accent,borderRadius:10});
+      page.drawText(esc(label),{x:W/2-font.widthOfTextAtSize(esc(label),12)/2,y:y-1,size:12,color:rgb(1,1,1),font:font});
+      y-=24;
+      var num=0;
+      V.A.concat(V.B).concat(V.C).forEach(function(tt){
+        num++;
+        var pts = tt.level==="base"?1:(tt.level==="olimp"?3:2);
+        var bodyLines=wrap(tt.text,10.5), optJoined="";
+        if(tt.options&&tt.options.length){ tt.options.forEach(function(o,i){ optJoined+=((i+1)+") "+o)+"     "; }); }
+        var optLines = tt.options&&tt.options.length ? wrapText(font,optJoined,cw-14,10) : [];
+        var needed = 13 + bodyLines.length*12.5 + optLines.length*12 + 14;
+        if(y < needed+60){ page=doc.addPage(ctx.A4); y=H-52; }
+        var h="Задание "+num+". ";
+        page.drawText(esc(h),{x:M,y:y,size:11.5,color:accent,font:font});
+        page.drawText(esc("("+pts+" балл"+(pts===1?"":"а")+")"),{x:M+font.widthOfTextAtSize(h,11.5)+2,y:y,size:10,color:inkSoft,font:font});
+        y-=15;
+        bodyLines.forEach(function(ln){ page.drawText(esc(ln),{x:M+2,y:y,size:10.5,color:ink,font:font}); y-=12.5; });
+        y-=2;
+        if(optLines.length){
+          optLines.forEach(function(ln){ page.drawText(esc(ln),{x:M+14,y:y,size:10,color:inkSoft,font:font}); y-=12; });
+          y-=3;
+        }
+        y-=6;
+      });
+      y-=6;
+      if(y>100) page.drawLine({start:{x:M,y:y},end:{x:M+cw,y:y},thickness:0.7,color:line});
+    });
+    return doc;
+  }).then(function(doc){ return doc.save(); })
+    .then(function(bytes){ window.__downloadPdfBytes(bytes, opts.fileName||"Контрольная_работа.pdf"); });
+};
+
+/* ============ PDF: банк задач ============ */
+window.OLYMP_buildBankPdf=function(tasks, title, fileName){
+  // tasks: [{text,options?,answer?,level}]
+  return pdfDoc().then(function(ctx){
+    var doc=ctx.doc, font=ctx.font, W=595.28, H=841.89, M=42, cw=W-2*M;
+    var rgb=ctx.rgb, ink=rgb(0.12,0.15,0.28), inkSoft=rgb(0.32,0.36,0.55), accent=rgb(0.27,0.42,0.88), line=rgb(0.80,0.83,0.91), band=rgb(0.95,0.96,0.995);
+    var wrap=function(text,size){ return wrapText(font,text,cw-8,size); };
+    var page=doc.addPage(ctx.A4); var y=H-50;
+    function t(s,x,size,color,gap){ page.drawText(esc(s),{x:x,y:y,size:size,color:color||ink,font:font}); y-=(gap!==undefined?gap:(size+4)); }
+    function center(s,size,color,gap){ var w=font.widthOfTextAtSize(esc(s),size); t(s,W/2-w/2,size,color,gap); }
+    page.drawRectangle({x:0,y:H-66,width:W,height:66,color:band});
+    page.drawLine({start:{x:0,y:H-66},end:{x:W,y:H-66},thickness:2,color:accent});
+    y=H-38;
+    var hsize = font.widthOfTextAtSize(esc(title||"Банк задач"),14)>cw ? 11.5 : 14;
+    wrap(title||"Банк задач",hsize).forEach(function(ln){ center(ln,hsize,ink,20); });
+    y-=2;
+    center("Блок A \u2013 база (1 балл) \u00B7 блок B \u2013 актив (2) \u00B7 блок C \u2013 олимп (3).",9.5,inkSoft,14);
+    y-=8;
+    page.drawLine({start:{x:M,y:y},end:{x:M+cw,y:y},thickness:1,color:line});
+    y-=18;
+    var num=0;
+    tasks.forEach(function(tt){
+      num++;
+      var tag = tt.level==="base"?"A":(tt.level==="olimp"?"C":"B");
+      var bodyLines=wrap(tt.text,10.5);
+      var ansLines=wrap(tt.answer?("Ответ: "+tt.answer):"",10);
+      var needed = 14 + bodyLines.length*12.5 + ansLines.length*12.5 + 12;
+      if(y < needed+60){ page=doc.addPage(ctx.A4); y=H-56; }
+      page.drawText(esc(num+". [\u0411\u043b\u043e\u043a "+tag+"]"), {x:M,y:y,size:11,color:accent,font:font});
+      y-=15;
+      bodyLines.forEach(function(ln){ page.drawText(esc(ln),{x:M+4,y:y,size:10.5,color:ink,font:font}); y-=12.5; });
+      y-=2;
+      if(ansLines.length){
+        ansLines.forEach(function(ln){ page.drawText(esc(ln),{x:M+4,y:y,size:10,color:inkSoft,font:font}); y-=12.5; });
+      }
+      y-=7;
+      page.drawLine({start:{x:M,y:y+10},end:{x:M+cw,y:y+10},thickness:0.3,color:line});
+    });
+    return doc;
+  }).then(function(doc){ return doc.save(); })
+    .then(function(bytes){ window.__downloadPdfBytes(bytes, fileName||"Банк_задач.pdf"); });
+};
+
+/* ============ PDF: статистика класса ============ */
+window.OLYMP_buildStatsPdf=function(clsName, rows, olympTable, fileName){
+  // rows: [{name, xp, level, solved, olymp, pct}]
+  // olympTable: [{name, hearts:bool[]}]
+  return pdfDoc().then(function(ctx){
+    var doc=ctx.doc, font=ctx.font, W=595.28, H=841.89, M=42, cw=W-2*M;
+    var rgb=ctx.rgb, ink=rgb(0.12,0.15,0.28), inkSoft=rgb(0.32,0.36,0.55), accent=rgb(0.27,0.42,0.88), line=rgb(0.80,0.83,0.91), band=rgb(0.95,0.96,0.995);
+    var page=doc.addPage(ctx.A4); var y=H-50;
+    function t(s,x,size,color,gap){ page.drawText(esc(s),{x:x,y:y,size:size,color:color||ink,font:font}); y-=(gap!==undefined?gap:(size+4)); }
+    page.drawRectangle({x:0,y:H-66,width:W,height:66,color:band});
+    page.drawLine({start:{x:0,y:H-66},end:{x:W,y:H-66},thickness:2,color:accent});
+    y=H-36;
+    t("Статистика класса \u00AB"+(clsName||"")+"\u00BB",M,14,ink,20);
+    t("Прогресс, олимпиады РСОШ · экспорт из раздела «Классы»",M,9.5,inkSoft,14);
+    y-=6;
+    page.drawLine({start:{x:M,y:y},end:{x:M+cw,y:y},thickness:1,color:line});
+    y-=20;
+
+    // Таблица учеников
+    var cols=[{h:"Ученик",w:0.34},{h:"XP",w:0.10},{h:"Уровень",w:0.20},{h:"Задач",w:0.12},{h:"Олимп",w:0.12},{h:"Блоки %",w:0.12}];
+    var colW=cw, x0=M;
+    function cellW(c){ return colW*c.w; }
+    // заголовок
+    var cx=M;
+    cols.forEach(function(c){ page.drawText(esc(c.h),{x:cx+2,y:y,size:9,color:rgb(1,1,1),font:font}); cx+=cellW(c); });
+    page.drawRectangle({x:M,y:y-3,width:cw,height:16,color:accent});
+    // перерисовать заголовок поверх rect
+    cx=M; cols.forEach(function(c){ page.drawText(esc(c.h),{x:cx+2,y:y,size:9,color:rgb(1,1,1),font:font}); cx+=cellW(c); });
+    y-=20;
+    // закрасить строки под таблицей просто как линии-разделители
+    rows.forEach(function(r){
+      if(y<70){ page=doc.addPage(ctx.A4); y=H-56; }
+      cx=M; var vals=[r.name,String(r.xp),r.level,String(r.solved),String(r.olymp),String(r.pct)];
+      cols.forEach(function(c,i){
+        var vtxt=esc(vals[i]);
+        var sz= c.w<0.20 ? 8 : 9;
+        if(font.widthOfTextAtSize(vtxt,sz)> cellW(c)-4){ vtxt=wrapText(font,vtxt,cellW(c)-4,sz).join(" "); }
+        page.drawText(vtxt,{x:cx+2,y:y,size:sz,color:ink,font:font}); cx+=cellW(c);
+      });
+      page.drawLine({start:{x:M,y:y-4},end:{x:M+cw,y:y-4},thickness:0.3,color:line});
+      y-=16;
+    });
+    y-=14;
+    // Раздел: успеваемость по олимпиадам
+    page.drawText(esc("Успеваемость по олимпиадам РСОШ"),{x:M,y:y,size:12,color:accent,font:font});
+    y-=16;
+    if(y<70){ page=doc.addPage(ctx.A4); y=H-56; }
+    if(!olympTable || !olympTable.length){
+      page.drawText(esc("Нет данных."),{x:M,y:y,size:10,color:inkSoft,font:font});
+      y-=14;
+    } else {
+      var oh=olympTable[0].hearts?olympTable[0].hearts.length:0;
+      var nameW=120, heartW=16, hx=M+nameW;
+      page.drawText(esc("Ученик"),{x:M,y:y,size:9,color:inkSoft,font:font});
+      page.drawText(esc("Всего олимп. №1.."+oh),{x:hx,y:y,size:8,color:inkSoft,font:font});
+      y-=13;
+      olympTable.forEach(function(rw){
+        if(y<60){ page=doc.addPage(ctx.A4); y=H-56; }
+        page.drawText(esc(rw.name),{x:M,y:y,size:9,color:ink,font:font});
+        (rw.hearts||[]).forEach(function(on,i){
+          page.drawText(on?"\u2665":"\u2661",{x:hx+i*heartW,y:y,size:9,color:on?rgb(0.9,0.3,0.2):inkSoft,font:font});
+        });
+        y-=14;
+      });
+    }
+    return doc;
+  }).then(function(doc){ return doc.save(); })
+    .then(function(bytes){ window.__downloadPdfBytes(bytes, fileName||("Статистика_класса_"+(clsName||"")+".pdf")); });
+};
+
+})();
