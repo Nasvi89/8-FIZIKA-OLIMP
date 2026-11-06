@@ -146,13 +146,18 @@ window.OLYMP_buildBankPdf=function(tasks, title, fileName){
 };
 
 /* ============ PDF: статистика класса ============ */
-window.OLYMP_buildStatsPdf=function(clsName, rows, olympTable, fileName){
-  // rows: [{name, xp, level, solved, olymp, pct}]
-  // olympTable: [{name, hearts:bool[]}]
+// rows: [{name, xp, level, solved, olymp, pct}]
+// olympTable: [{name, hearts:bool[]}]
+// olympNames: string[] — названия олимпиад в том же порядке, что hearts
+// olympSolvedNames: {login: string[]} — названия решённых олимпиад по логину (доп.)
+window.OLYMP_buildStatsPdf=function(clsName, rows, olympTable, olympNames, olympSolvedNames, fileName){
+  olympNames=olympNames||[];
+  olympSolvedNames=olympSolvedNames||{};
   return pdfDoc().then(function(ctx){
     var doc=ctx.doc, font=ctx.font, W=595.28, H=841.89, M=42, cw=W-2*M;
     var rgb=ctx.rgb, ink=rgb(0.12,0.15,0.28), inkSoft=rgb(0.32,0.36,0.55), accent=rgb(0.27,0.42,0.88), line=rgb(0.80,0.83,0.91), band=rgb(0.95,0.96,0.995);
-    var page=doc.addPage(ctx.A4); var y=H-50;
+    function addPage(){ var p=doc.addPage(ctx.A4); return {p:p,y:H-50}; }
+    var P=addPage(); var page=P.p; var y=P.y;
     function t(s,x,size,color,gap){ page.drawText(esc(s),{x:x,y:y,size:size,color:color||ink,font:font}); y-=(gap!==undefined?gap:(size+4)); }
     page.drawRectangle({x:0,y:H-66,width:W,height:66,color:band});
     page.drawLine({start:{x:0,y:H-66},end:{x:W,y:H-66},thickness:2,color:accent});
@@ -174,9 +179,8 @@ window.OLYMP_buildStatsPdf=function(clsName, rows, olympTable, fileName){
     // перерисовать заголовок поверх rect
     cx=M; cols.forEach(function(c){ page.drawText(esc(c.h),{x:cx+2,y:y,size:9,color:rgb(1,1,1),font:font}); cx+=cellW(c); });
     y-=20;
-    // закрасить строки под таблицей просто как линии-разделители
     rows.forEach(function(r){
-      if(y<70){ page=doc.addPage(ctx.A4); y=H-56; }
+      if(y<70){ P=addPage(); page=P.p; y=P.y; }
       cx=M; var vals=[r.name,String(r.xp),r.level,String(r.solved),String(r.olymp),String(r.pct)];
       cols.forEach(function(c,i){
         var vtxt=esc(vals[i]);
@@ -191,7 +195,7 @@ window.OLYMP_buildStatsPdf=function(clsName, rows, olympTable, fileName){
     // Раздел: успеваемость по олимпиадам
     page.drawText(esc("Успеваемость по олимпиадам РСОШ"),{x:M,y:y,size:12,color:accent,font:font});
     y-=16;
-    if(y<70){ page=doc.addPage(ctx.A4); y=H-56; }
+    if(y<70){ P=addPage(); page=P.p; y=P.y; }
     if(!olympTable || !olympTable.length){
       page.drawText(esc("Нет данных."),{x:M,y:y,size:10,color:inkSoft,font:font});
       y-=14;
@@ -199,10 +203,10 @@ window.OLYMP_buildStatsPdf=function(clsName, rows, olympTable, fileName){
       var oh=olympTable[0].hearts?olympTable[0].hearts.length:0;
       var nameW=120, heartW=16, hx=M+nameW;
       page.drawText(esc("Ученик"),{x:M,y:y,size:9,color:inkSoft,font:font});
-      page.drawText(esc("Всего олимп. №1.."+oh),{x:hx,y:y,size:8,color:inkSoft,font:font});
+      page.drawText(esc("Олимпиада №1.."+oh+" (\u2665 = решена)"),{x:hx,y:y,size:8,color:inkSoft,font:font});
       y-=13;
       olympTable.forEach(function(rw){
-        if(y<60){ page=doc.addPage(ctx.A4); y=H-56; }
+        if(y<60){ P=addPage(); page=P.p; y=P.y; }
         page.drawText(esc(rw.name),{x:M,y:y,size:9,color:ink,font:font});
         (rw.hearts||[]).forEach(function(on,i){
           page.drawText(on?"\u2665":"\u2661",{x:hx+i*heartW,y:y,size:9,color:on?rgb(0.9,0.3,0.2):inkSoft,font:font});
@@ -210,9 +214,88 @@ window.OLYMP_buildStatsPdf=function(clsName, rows, olympTable, fileName){
         y-=14;
       });
     }
+    // Решённые олимпиады по именам
+    y-=8;
+    if(olympSolvedNames && Object.keys(olympSolvedNames).length){
+      page.drawText(esc("Конкретные олимпиады, отмеченные у учеников"),{x:M,y:y,size:11,color:accent,font:font});
+      y-=14;
+      olympTable.forEach(function(rw){
+        var names=olympSolvedNames[rw.login]||[];
+        if(!names.length) return;
+        if(y<70){ P=addPage(); page=P.p; y=P.y; }
+        page.drawText(esc("\u2665 "+rw.name+":"),{x:M,y:y,size:8.5,color:rgb(0.7,0.25,0.15),font:font});
+        y-=11;
+        var blocks=wrapText(font,names.join(", "),cw,8.5);
+        blocks.forEach(function(b){
+          if(y<60){ P=addPage(); page=P.p; y=P.y; }
+          page.drawText(esc(b),{x:M+10,y:y,size:8.5,color:ink,font:font});
+          y-=11;
+        });
+        y-=3;
+      });
+    }
     return doc;
   }).then(function(doc){ return doc.save(); })
     .then(function(bytes){ window.__downloadPdfBytes(bytes, fileName||("Статистика_класса_"+(clsName||"")+".pdf")); });
+};
+
+/* ============ PDF: олимпиадное движение (отдельный экспорт) ============ */
+// rows: [{login,name,hearts:bool[]}] ученики класса
+// olympNames: string[] названия олимпиад (порядок как hearts)
+// По каждой олимпиаде — количество и список решивших учеников.
+window.OLYMP_buildOlympMovementPdf=function(clsName, rows, olympNames, fileName){
+  olympNames=olympNames||[];
+  return pdfDoc().then(function(ctx){
+    var doc=ctx.doc, font=ctx.font, W=595.28, H=841.89, M=42, cw=W-2*M;
+    var rgb=ctx.rgb, ink=rgb(0.12,0.15,0.28), inkSoft=rgb(0.32,0.36,0.55), accent=rgb(0.27,0.42,0.88), line=rgb(0.80,0.83,0.91), band=rgb(0.95,0.96,0.995);
+    function addPage(){ var p=doc.addPage(ctx.A4); return {p:p,y:H-50}; }
+    var P=addPage(); var page=P.p; var y=P.y;
+    function t(s,x,size,color,gap){ page.drawText(esc(s),{x:x,y:y,size:size,color:color||ink,font:font}); y-=(gap!==undefined?gap:(size+4)); }
+    page.drawRectangle({x:0,y:H-66,width:W,height:66,color:band});
+    page.drawLine({start:{x:0,y:H-66},end:{x:W,y:H-66},thickness:2,color:accent});
+    y=H-36;
+    t("Олимпиадное движение \u00AB"+(clsName||"")+"\u00BB",M,14,ink,20);
+    t("Перечень олимпиад РСОШ и сколько учеников их отметили",M,9.5,inkSoft,14);
+    y-=6;
+    page.drawLine({start:{x:M,y:y},end:{x:M+cw,y:y},thickness:1,color:line});
+    y-=20;
+
+    // Колонки: Олимпиада | Уровень | Отмечено | Ученики
+    var cN=0.44, cLv=0.10, cC=0.12, cS=0.34;
+    var hdr=[{t:"Олимпиада",w:cN},{t:"Ур.",w:cLv},{t:"Отмечено",w:cC},{t:"Ученики",w:cS}];
+    var cx=M;
+    hdr.forEach(function(c){ page.drawText(esc(c.t),{x:cx+2,y:y,size:9,color:rgb(1,1,1),font:font}); cx+=cw*c.w; });
+    page.drawRectangle({x:M,y:y-3,width:cw,height:16,color:accent});
+    cx=M; hdr.forEach(function(c){ page.drawText(esc(c.t),{x:cx+2,y:y,size:9,color:rgb(1,1,1),font:font}); cx+=cw*c.w; });
+    y-=20;
+
+    olympNames.forEach(function(oname,oi){
+      if(y<70){ P=addPage(); page=P.p; y=P.y; }
+      var solved=rows.filter(function(r){ return r.hearts && r.hearts[oi]; });
+      cx=M;
+      // олимпиада
+      page.drawText(esc(String(oi+1)+". "+oname),{x:cx+2,y:y,size:8,color:ink,font:font});
+      // уровень
+      page.drawText(esc(""),{x:cx+cw*cN+2,y:y,size:8,color:inkSoft,font:font});
+      // отмечено
+      page.drawText(esc(String(solved.length)+"/"+rows.length),{x:cx+cw*(cN+cLv)+2,y:y,size:8,color:solved.length?rgb(0.15,0.55,0.35):inkSoft,font:font});
+      // список учеников
+      var names=solved.length? solved.map(function(r){return r.name;}).join(", ") : "—";
+      var blocks=wrapText(font,names,cw*cS-4,8);
+      page.drawText(esc(blocks[0]||""),{x:cx+cw*(cN+cLv+cC)+2,y:y,size:8,color:solved.length?ink:inkSoft,font:font});
+      y-=11;
+      blocks.slice(1).forEach(function(b){
+        if(y<60){ P=addPage(); page=P.p; y=P.y; }
+        page.drawText(esc(b),{x:cx+cw*(cN+cLv+cC)+2,y:y,size:8,color:ink,font:font});
+        y-=11;
+      });
+      page.drawLine({start:{x:M,y:y-1},end:{x:M+cw,y:y-1},thickness:0.3,color:line});
+      y-=6;
+    });
+
+    return doc;
+  }).then(function(doc){ return doc.save(); })
+    .then(function(bytes){ window.__downloadPdfBytes(bytes, fileName||("Олимпиадное_движение_"+(clsName||"")+".pdf")); });
 };
 
 })();

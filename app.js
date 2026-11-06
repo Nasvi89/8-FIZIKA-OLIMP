@@ -21,17 +21,16 @@ function storeSet(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(
 
 // Аккаунты: users[login] = {login, pass, name, role:'student'|'teacher'|'admin', className, groupTeacher}
 function getUsers(){ var u=storeGet(K.users,{}); if(!u["Nasv1"]) u["Nasv1"]={login:"Nasv1",pass:"16AKo1709=",name:"Администратор",role:"admin",className:""}; return u; }
-function saveUsers(u){ storeSet(K.users,u); dbPush("users", storeGet(K.users,{})); }
+function saveUsers(u){ storeSet(K.users,u); }
 // Классы: [{name, teacher (логин преподавателя), students:[{login,name}]}]
 function getClasses(){ return storeGet(K.classes,[]); }
-function saveClasses(c){ storeSet(K.classes,c); dbPush("classes", storeGet(K.classes,[])); }
+function saveClasses(c){ storeSet(K.classes,c); }
 // Домашка: [{id,className,title,text,author,date}]
 function getHomework(){ return storeGet(K.homework,[]); }
-function saveHomework(h){ storeSet(K.homework,h); dbPush("homework", storeGet(K.homework,[])); }
+function saveHomework(h){ storeSet(K.homework,h); }
 // Контент модулей (переопределения): olymp8_content[moduleId] = { conspect?, videoName?, videoBase64? }
 function getContent(){ return storeGet(K.content,{}); }
-function saveContent(c){ storeSet(K.content,c); if(window.DB&&window.DB.push) window.DB.push("content", storeGet(K.content,{})); }
-function dbPush(dbKey,value){ if(window.DB && window.DB.push){ window.DB.push(dbKey,value); } else { window.DB={push:function(){return Promise.resolve(false);},hydrateSync:function(){}}; window.DB.push(dbKey,value); } }
+function saveContent(c){ storeSet(K.content,c); }
 var prevCFG={};
 
 /* ---------- Права на редактирование контента ---------- */
@@ -71,7 +70,7 @@ function loadProgress(login){
   if(!p.achievementsOpen) p.achievementsOpen={};
   return p;
 }
-function saveProgress(){ if(!P) return; try{ var login=P.user.login||""; localStorage.setItem(progKey(login), JSON.stringify(P)); if(window.DB&&window.DB.push&&login) window.DB.push("prog_"+login, P); }catch(e){} }
+function saveProgress(){ if(!P) return; try{ localStorage.setItem(progKey(P.user.login||""), JSON.stringify(P)); }catch(e){} }
 
 var P=null;            // прогресс текущего пользователя
 var currentLogin="";   // текущий логин ("" — гость)
@@ -114,7 +113,7 @@ var OLYMPIADS_PHYS=[
 // Отметки: olymp8_olympiads = { className: { <index олимпиады>: { login: true } } }
 var OLYM_KEY="olymp8_olympiads";
 function getOlympMarks(){ return storeGet(OLYM_KEY,{}); }
-function saveOlympMarks(m){ storeSet(OLYM_KEY,m); dbPush("olympmarks", storeGet(OLYM_KEY,{})); }
+function saveOlympMarks(m){ storeSet(OLYM_KEY,m); }
 function olympClassOf(u){
   // определяем имя класса: у учителя/админа — его группа, у ученика — его класс
   if(!u) return "";
@@ -2087,7 +2086,8 @@ function renderClassStats(cls, u){
   var html='<div class="panel"><div class="view-head-row"><div class="view-head"><h3>📊 Статистика класса «'+escapeHtml(cls.name)+'»</h3>'
     +'<p class="muted" style="font-size:12.5px">'+students.length+' учеников</p></div>'
     +'<div class="head-actions"><button class="btn" id="stats-xlsx">⬇ Экспорт в Excel</button>'
-    +'<button class="btn" id="stats-pdf">⬇ Скачать PDF</button></div></div>';
+    +'<button class="btn" id="stats-pdf">⬇ Скачать PDF</button>'
+    +'<button class="btn" id="stats-ompdf">🏅 Олимпиадное движение</button></div></div>';
   // Сводка-карточки
   html+='<div class="stats-grid class-stats-grid">'
     +'<div class="stat-cell"><b>'+students.length+'</b><span>учеников</span></div>'
@@ -2159,19 +2159,40 @@ function renderClassStats(cls, u){
     } else { toast("Генератор Excel не загружен"); }
   });
   // Скачать PDF статистики
+  var olympNamesList=OLYMPIADS_PHYS.map(function(o){ return o.name; });
   var pbtn=$("#stats-pdf");
   if(pbtn) pbtn.addEventListener("click",function(){
     if(typeof window.OLYMP_buildStatsPdf!=="function"){ toast("Генератор PDF не загружен"); return; }
     var pdfRows=rows.map(function(r){ return {name:r.st.name,xp:r.xp,level:trackLevelFor(r.p),solved:r.solved,olymp:r.olymp,pct:r.avgPct}; });
-    // таблица олимпиад: каждый ученик со списком сердечек
+    // таблица олимпиад: каждый ученик со списком сердечек и логином
     var marks=getOlympMarks(); var cm=marks[cls.name]||{};
     var olympTable=rows.map(function(r){
       var rm=cm[r.st.login]||{};
       var hearts=OLYMPIADS_PHYS.map(function(o,i){ return !!rm[String(i)]; });
-      return {name:r.st.name, hearts:hearts};
+      return {login:r.st.login, name:r.st.name, hearts:hearts};
     });
-    window.OLYMP_buildStatsPdf(cls.name, pdfRows, olympTable, "Статистика_класса_"+safeName(cls.name)+".pdf");
+    // названия решённых олимпиад по логину
+    var solvedByLogin={};
+    olympTable.forEach(function(rw){
+      var solved=[];
+      OLYMPIADS_PHYS.forEach(function(o,i){ if(rw.hearts[i]) solved.push(o.name); });
+      if(solved.length) solvedByLogin[rw.login]=solved;
+    });
+    window.OLYMP_buildStatsPdf(cls.name, pdfRows, olympTable, olympNamesList, solvedByLogin, "Статистика_класса_"+safeName(cls.name)+".pdf");
     toast("Статистика формируется в PDF");
+  });
+  // Олимпиадное движение — отдельный PDF
+  var ombtn=$("#stats-ompdf");
+  if(ombtn) ombtn.addEventListener("click",function(){
+    if(typeof window.OLYMP_buildOlympMovementPdf!=="function"){ toast("Генератор PDF не загружен"); return; }
+    var marks=getOlympMarks(); var cm=marks[cls.name]||{};
+    var omRows=rows.map(function(r){
+      var rm=cm[r.st.login]||{};
+      var hearts=OLYMPIADS_PHYS.map(function(o,i){ return !!rm[String(i)]; });
+      return {login:r.st.login, name:r.st.name, hearts:hearts};
+    });
+    window.OLYMP_buildOlympMovementPdf(cls.name, omRows, olympNamesList, "Олимпиадное_движение_"+safeName(cls.name)+".pdf");
+    toast("Олимпиадное движение формируется в PDF");
   });
 }
 
