@@ -252,10 +252,8 @@ window.OLYMP_buildOlympMovementPdf=function(clsName, rows, olympNames, olympLeve
     var rgb=ctx.rgb, ink=rgb(0.12,0.15,0.28), inkSoft=rgb(0.32,0.36,0.55), accent=rgb(0.27,0.42,0.88), line=rgb(0.80,0.83,0.91), band=rgb(0.95,0.96,0.995), ok=rgb(0.15,0.55,0.35), no=rgb(0.6,0.63,0.72);
     function t(p,s,x,size,color,gap){ p.drawText(esc(s),{x:x,y:y,size:size,color:color||ink,font:font}); y-=(gap!==undefined?gap:(size+4)); }
 
-    function studentPage(rw, isFirst){
-      var page;
-      if(isFirst){ page=doc.getPages()[0]; }
-      else { page=doc.addPage(ctx.A4); }
+    function studentPage(rw){
+      var page=doc.addPage(ctx.A4);
       var py=H-52;
       page.drawRectangle({x:0,y:H-66,width:W,height:66,color:band});
       page.drawLine({start:{x:0,y:H-66},end:{x:W,y:H-66},thickness:2,color:accent});
@@ -293,7 +291,7 @@ window.OLYMP_buildOlympMovementPdf=function(clsName, rows, olympNames, olympLeve
       page.drawText(esc("Итог: решено "+solvedCount+" из "+count),{x:M,y:py,size:9.5,color:solvedCount?ok:inkSoft,font:font});
     }
 
-    (rows||[]).forEach(function(rw,idx){ studentPage(rw, idx===0); });
+    (rows||[]).forEach(function(rw){ studentPage(rw); });
     return doc;
   }).then(function(doc){ return doc.save(); })
     .then(function(bytes){ window.__downloadPdfBytes(bytes, fileName||("Олимпиадное_движение_"+(clsName||"")+".pdf")); });
