@@ -2191,7 +2191,8 @@ function renderClassStats(cls, u){
       var hearts=OLYMPIADS_PHYS.map(function(o,i){ return !!rm[String(i)]; });
       return {login:r.st.login, name:r.st.name, hearts:hearts};
     });
-    window.OLYMP_buildOlympMovementPdf(cls.name, omRows, olympNamesList, "Олимпиадное_движение_"+safeName(cls.name)+".pdf");
+    var olympLevelsList=OLYMPIADS_PHYS.map(function(o){ return o.level; });
+    window.OLYMP_buildOlympMovementPdf(cls.name, omRows, olympNamesList, olympLevelsList, "Олимпиадное_движение_"+safeName(cls.name)+".pdf");
     toast("Олимпиадное движение формируется в PDF");
   });
 }
