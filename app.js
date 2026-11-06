@@ -108,8 +108,14 @@ var OLYMPIADS_PHYS=[
   { level:3, name:"Олимпиада «Будущее Сибири»" },
   { level:3, name:"Открытая региональная межвузовская олимпиада школьников ОРМО" },
   { level:3, name:"Отраслевая олимпиада школьников «Газпром»" },
-  { level:3, name:"Университетская олимпиада школьников «Бельчонок»" }
+  { level:3, name:"Университетская олимпиада школьников «Бельчонок»" },
+  { level:0, mp:true, name:"СВОШ" },
+  { level:0, mp:true, name:"45 параллель" }
 ];
+// Вспомогательные функции для олимпиад (уровень/МинПрос)
+function olympChipClass(o){ return o&&o.mp ? "clvl-mp" : (o.level===1?"clvl-i":(o.level===2?"clvl-ii":"clvl-iii")); }
+function olympChipLabel(o){ return o&&o.mp ? "МинПрос" : String(o.level); }
+function olympChipText(o){ return o&&o.mp ? "МинПрос" : ("Уровень "+o.level); }
 // Отметки: olymp8_olympiads = { className: { <index олимпиады>: { login: true } } }
 var OLYM_KEY="olymp8_olympiads";
 function getOlympMarks(){ return storeGet(OLYM_KEY,{}); }
@@ -1421,7 +1427,8 @@ function renderOlympiads(){
   html+='<div class="olimp-legend"><span class="olimp-lvl-chip clvl-i">Уровень I</span>'
     +'<span class="olimp-lvl-chip clvl-ii">Уровень II</span>'
     +'<span class="olimp-lvl-chip clvl-iii">Уровень III</span>'
-    +'<span class="muted" style="font-size:12px">Выше уровень — больше льгот при поступлении</span></div>';
+    +'<span class="olimp-lvl-chip clvl-mp">МинПрос</span>'
+    +'<span class="muted" style="font-size:12px">Выше уровень — больше льгот при поступлении; МинПрос — из перечня Минпросвещения</span></div>';
 
   if(!students.length){
     html+='<div class="muted" style="margin-top:14px">В классе нет учеников.</div>';
@@ -1429,8 +1436,8 @@ function renderOlympiads(){
     // Таблица
     html+='<div class="olimp-scroll"><table class="olimp-table"><thead><tr><th class="ol-th-name">Ученик</th>';
     items.forEach(function(o,i){
-      var lvlCls = o.level===1?"clvl-i":(o.level===2?"clvl-ii":"clvl-iii");
-      html+='<th class="ol-th-'+o.level+'"><span class="olimp-lvl-chip '+lvlCls+'">'+o.level+'</span><div class="ol-th-name">'+escapeHtml(o.name)+'</div></th>';
+      var lvlCls = olympChipClass(o);
+      html+='<th class="ol-th-'+o.level+'"><span class="olimp-lvl-chip '+olympChipClass(o)+'">'+olympChipLabel(o)+'</span><div class="ol-th-name">'+escapeHtml(o.name)+'</div></th>';
     });
     html+='<th class="ol-th-total">Решено</th></tr></thead><tbody>';
 
@@ -1806,15 +1813,16 @@ function renderClassOlympiads(cls, u){
   html+='<div class="olimp-legend"><span class="olimp-lvl-chip clvl-i">Уровень I</span>'
     +'<span class="olimp-lvl-chip clvl-ii">Уровень II</span>'
     +'<span class="olimp-lvl-chip clvl-iii">Уровень III</span>'
-    +'<span class="muted" style="font-size:12px">Выше уровень — больше льгот при поступлении</span></div>';
+    +'<span class="olimp-lvl-chip clvl-mp">МинПрос</span>'
+    +'<span class="muted" style="font-size:12px">Выше уровень — больше льгот при поступлении; МинПрос — из перечня Минпросвещения</span></div>';
 
   if(!students.length){
     html+='<div class="muted" style="margin-top:14px">В классе нет учеников. Открой «Состав класса», чтобы добавить.</div>';
   } else {
     html+='<div class="olimp-scroll"><table class="olimp-table"><thead><tr><th class="ol-th-name">Ученик</th>';
     items.forEach(function(o,i){
-      var lvlCls = o.level===1?"clvl-i":(o.level===2?"clvl-ii":"clvl-iii");
-      html+='<th class="ol-th-'+o.level+'"><span class="olimp-lvl-chip '+lvlCls+'">'+o.level+'</span><div class="ol-th-name">'+escapeHtml(o.name)+'</div></th>';
+      var lvlCls = olympChipClass(o);
+      html+='<th class="ol-th-'+o.level+'"><span class="olimp-lvl-chip '+olympChipClass(o)+'">'+olympChipLabel(o)+'</span><div class="ol-th-name">'+escapeHtml(o.name)+'</div></th>';
     });
     html+='<th class="ol-th-total">Решено</th></tr></thead><tbody>';
     students.forEach(function(st){
@@ -2128,7 +2136,7 @@ function renderClassStats(cls, u){
   html+='<div class="panel"><h3>Успеваемость по олимпиадам РСОШ</h3>';
   var marks=getOlympMarks(); var cm=marks[cls.name]||{};
   html+='<div class="olimp-scroll"><table class="olimp-table"><thead><tr><th class="ol-th-name">Ученик</th>';
-  OLYMPIADS_PHYS.forEach(function(o,i){ var lc=o.level===1?"clvl-i":(o.level===2?"clvl-ii":"clvl-iii"); html+='<th class="ol-th-'+o.level+'"><span class="olimp-lvl-chip '+lc+'">'+o.level+'</span></th>'; });
+  OLYMPIADS_PHYS.forEach(function(o,i){ html+='<th class="ol-th-'+o.level+'"><span class="olimp-lvl-chip '+olympChipClass(o)+'">'+olympChipLabel(o)+'</span></th>'; });
   html+='<th class="ol-th-total">Всего</th></tr></thead><tbody>';
   rows.forEach(function(r){
     html+='<tr><td class="ol-td-name">'+escapeHtml(r.st.name)+'</td>';
@@ -2287,15 +2295,16 @@ function renderStudentStats(){
   html+='<div class="olimp-legend"><span class="olimp-lvl-chip clvl-i">Уровень I</span>'
     +'<span class="olimp-lvl-chip clvl-ii">Уровень II</span>'
     +'<span class="olimp-lvl-chip clvl-iii">Уровень III</span>'
-    +'<span class="muted" style="font-size:12px">Выше уровень — больше льгот при поступлении</span></div>';
+    +'<span class="olimp-lvl-chip clvl-mp">МинПрос</span>'
+    +'<span class="muted" style="font-size:12px">Выше уровень — больше льгот при поступлении; МинПрос — из перечня Минпросвещения</span></div>';
 
   // Группируем по уровням
   html+='<div class="olimp-scroll"><table class="olimp-table"><thead><tr><th class="ol-th-name">Олимпиада</th><th>Уровень</th><th>Статус</th></tr></thead><tbody>';
   OLYMPIADS_PHYS.forEach(function(o,i){
-    var lvlCls = o.level===1?"clvl-i":(o.level===2?"clvl-ii":"clvl-iii");
+    var lvlCls = olympChipClass(o);
     var on=!!myMarks[String(i)];
     html+='<tr><td class="ol-td-name">'+escapeHtml(o.name)+'</td>'
-      +'<td style="text-align:center"><span class="olimp-lvl-chip '+lvlCls+'">'+o.level+'</span></td>'
+      +'<td style="text-align:center"><span class="olimp-lvl-chip '+olympChipClass(o)+'">'+olympChipLabel(o)+'</span></td>'
       +'<td style="text-align:center">'+(on?'<span class="mystat-ok">❤️ решено</span>':'<span class="mystat-no">🤍 не отмечено</span>')+'</td></tr>';
   });
   html+='</tbody></table></div></div>';

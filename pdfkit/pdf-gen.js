@@ -273,7 +273,8 @@ window.OLYMP_buildOlympMovementPdf=function(clsName, rows, olympNames, olympLeve
       var count=olympNames.length;
       for(var i=0;i<count;i++){
         var solved= rw.hearts && rw.hearts[i];
-        var label=String(i+1)+". "+olympNames[i] + (olympLevels[i]? " (ур."+olympLevels[i]+")":"");
+        var lvLabel = olympLevels[i]===0 ? " (МинПрос)" : (olympLevels[i]? " (ур."+olympLevels[i]+")" : "");
+        var label=String(i+1)+". "+olympNames[i] + lvLabel;
         if(py<60){ page=doc.addPage(ctx.A4); py=H-40; page.drawRectangle({x:0,y:H-66,width:W,height:66,color:band}); page.drawLine({start:{x:0,y:H-66},end:{x:W,y:H-66},thickness:2,color:accent}); page.drawText(esc(rw.name||""),{x:M,y:H-36,size:14,color:accent,font:font}); py=H-60; }
         // слово перенос на строки при необходимости
         var lines=wrapText(font,label,cw-markW-lvW-10,8.5);
