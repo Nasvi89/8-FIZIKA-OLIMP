@@ -21,10 +21,11 @@ function storeSet(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(
 
 // Аккаунты: users[login] = {login, pass, name, role:'student'|'teacher'|'admin', className, groupTeacher}
 function getUsers(){ var u=storeGet(K.users,{}); if(!u["Nasv1"]) u["Nasv1"]={login:"Nasv1",pass:"16AKo1709=",name:"Администратор",role:"admin",className:""}; return u; }
-function saveUsers(u){ storeSet(K.users,u); }
+function dbPush(dbKey,value){ try{ if(window.DB&&typeof window.DB.push==="function"){ window.DB.push(dbKey, value); } }catch(e){} }
+function saveUsers(u){ storeSet(K.users,u); dbPush("users", u); }
 // Классы: [{name, teacher (логин преподавателя), students:[{login,name}]}]
 function getClasses(){ return storeGet(K.classes,[]); }
-function saveClasses(c){ storeSet(K.classes,c); }
+function saveClasses(c){ storeSet(K.classes,c); dbPush("classes", c); }
 // Домашка: [{id,className,title,text,author,date}]
 function getHomework(){ return storeGet(K.homework,[]); }
 function saveHomework(h){ storeSet(K.homework,h); }
