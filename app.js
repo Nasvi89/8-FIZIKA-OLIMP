@@ -255,7 +255,13 @@ function moduleUnlocked(moduleId){
   // администратору и преподавателям открыты все модули, ограничений как у учеников нет
   if(u && (u.role==="admin"||u.role==="teacher")) return true;
   var m=olympModuleMeta(moduleId); if(!m.req) return true;
-  return moduleMasteryPct(m.req)>=100;
+  // блок открывается, если предыдущий зачтён на 100% ИЛИ исчерпаны 3 попытки
+  return moduleMasteryPct(m.req)>=100 || moduleExhausted(m.req);
+}
+// Попытки предшествующего блока исчерпаны?
+function moduleExhausted(moduleId){
+  if(!P||!P.modStat||!P.modStat[moduleId]) return false;
+  return (P.modStat[moduleId].badSubmits||0)>=3 || !!P.modStat[moduleId].revealed;
 }
 function masterProg(moduleId){ return moduleMasteryPct(moduleId); }
 function moduleCompletedCount(){ if(!P) return 0; return OLYMP_MODULES.filter(function(m){return moduleMasteryPct(m.id)>=100;}).length; }
@@ -353,10 +359,11 @@ function renderModuleGrid(){
   OLYMP_MODULES.forEach(function(m){
     var unlocked=moduleUnlocked(m.id), prog=masterProg(m.id), complete=prog>=100;
     var ms=P.modStat[m.id];
+    var exhausted=moduleExhausted(m.id);
     var state="";
     if(complete) state='<span class="mt-state" style="color:var(--good)">✓ зачтён</span>';
     else if(!unlocked) state='<span class="mt-state" style="color:var(--muted)">🔒 '+m.req+': 100%</span>';
-    else state='<span class="mt-state" style="color:var(--electro)">доступен</span>';
+    else state='<span class="mt-state" style="color:var(--electro)">'+(exhausted?'доступен (попытки исчерпаны)':'доступен')+'</span>';
     var lvl='<div class="mt-lvl-badges">'+OLYMP_LEVELS.map(function(l){return '<span style="background:'+l.color+'">'+l.name+'</span>';}).join("")+'</div>';
     var cls='mod-tile '+(complete?'complete':unlocked&&!complete?'available':'locked')+(currentModuleId===m.id?' active-now':'');
     html+='<div class="'+cls+'" style="border-top-color:'+m.color+'" data-mod="'+m.id+'">'
