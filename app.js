@@ -445,7 +445,8 @@ function renderModuleWorkspace(){
       lh+='<div class="sub-open-head">'
         +'<button class="btn btn-sm" id="sub-back">← Ко всем темам</button>'
         +'<h3 class="sub-open-title">'+escapeHtml(sub.name)+'</h3></div>';
-      // Видео блока: вверху темы
+      // Видео блока: вверху темы (в сессии не показываем видео)
+      if(mid!=="session"){
       lh+='<div class="lesson-video-wrap"><div class="lesson-video">';
       if(cust.videoBase64){ lh+='<video controls src="'+cust.videoBase64+'"></video>'; }
       else if(lesson.video && lesson.video.type==="file"){ lh+='<video controls src="'+presSrcPath()+encodeURIComponent(lesson.video.src)+'"></video>'; }
@@ -459,6 +460,7 @@ function renderModuleWorkspace(){
           +'</div>';
       }
       lh+='</div>';
+      }
       // Кнопка редактирования конспекта НАД конспектом
       if(canEdit){
         lh+='<div class="conspect-edit-top"><button class="btn btn-sm" id="edit-conspect">✏️ Редактировать конспект</button></div>';
