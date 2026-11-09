@@ -359,22 +359,19 @@ function renderModuleGrid(){
   var html='<div class="module-grid">';
   var pinned=OLYMP_MODULES.filter(function(m){return m.pinned;});
   if(pinned.length){
-    html+='<div class="pinned-wrap"><div class="pinned-label">🔒 Закреплён · открыт всем</div><div class="module-grid pinned-grid">';
     pinned.forEach(function(m){
-      var unlocked=true, prog=masterProg(m.id), complete=prog>=100;
+      var prog=masterProg(m.id), complete=prog>=100;
       var ms=P.modStat[m.id];
       var state=complete?'<span class="mt-state" style="color:var(--good)">✓ зачтён</span>':'<span class="mt-state" style="color:var(--electro)">доступен</span>';
-      var lvl='<div class="mt-lvl-badges">'+OLYMP_LEVELS.map(function(l){return '<span style="background:'+l.color+'">'+l.name+'</span>';}).join("")+'</div>';
-      var cls='mod-tile available pinned-tile'+(currentModuleId===m.id?' active-now':'');
-      html+='<div class="'+cls+'" style="border-top-color:'+m.color+'" data-mod="'+m.id+'">'
-        +'<div class="mt-top"><span class="mt-no">Блок '+m.no+'</span><span class="mt-icon">'+m.icon+'</span></div>'
-        +'<h3>'+m.name+'</h3><div class="mt-desc">'+m.desc+'</div>'+lvl
-        +'<div class="mt-prog"><span class="mt-bar"><i style="width:'+prog+'%"></i></span><span>'+prog+'%</span></div>'
-        +'<div class="mt-top"><span class="mt-state">'+state+'</span></div>'
-        +'<button class="btn btn-primary btn-sm mt-action">'+(complete?'Повторить':'Начать')+' →</button>'
+      html+='<div class="session-banner" data-mod="'+m.id+'" style="background:linear-gradient(135deg,#0e7ab8,#1ba6e0)">'
+        +'<div class="sb-icon">'+m.icon+'</div>'
+        +'<div class="sb-body"><div class="sb-title">'+m.name+'</div>'
+        +'<div class="sb-desc">'+m.desc+'</div></div>'
+        +'<div class="sb-right"><span class="sb-state">'+state+'</span>'
+        +'<span class="sb-prog">'+prog+'%</span>'
+        +'<button class="btn btn-sm sb-btn">'+(complete?'Повторить':'Начать')+' →</button></div>'
         +'</div>';
     });
-    html+='</div></div>';
   }
   OLYMP_MODULES.forEach(function(m){
     if(m.pinned) return;
@@ -400,6 +397,8 @@ function renderModuleGrid(){
   wrap.innerHTML=html;
   $$(".mod-tile[data-mod] .mt-action").forEach(function(b){ b.addEventListener("click",function(e){ e.stopPropagation(); openModule(b.closest(".mod-tile").getAttribute("data-mod")); }); });
   $$(".mod-tile.available").forEach(function(c){ c.addEventListener("click",function(){ openModule(c.getAttribute("data-mod")); }); });
+  $$(".session-banner").forEach(function(c){ c.addEventListener("click",function(){ openModule(c.getAttribute("data-mod")); }); });
+  $$(".session-banner .sb-btn").forEach(function(b){ b.addEventListener("click",function(e){ e.stopPropagation(); openModule(b.closest(".session-banner").getAttribute("data-mod")); }); });
 }
 
 /* ---------- Рабочая область модуля ---------- */
@@ -1147,9 +1146,17 @@ function fillBankModuleFilter(){ var sel=$("#bank-module-filter"); if(!sel) retu
   OLYMP_MODULES.forEach(function(m){ var o=document.createElement("option"); o.value=m.id; o.textContent=m.no+". "+m.short; sel.appendChild(o); if(m.id===cur)o.selected=true; });
 }
 function extraTasks(){
-  var list=(typeof OLYMP_EXTRA_TASKS!=="undefined"&&OLYMP_EXTRA_TASKS.length?OLYMP_EXTRA_TASKS:[]);
-  if(typeof OLYMP_SESSION_TASKS!=="undefined"&&OLYMP_SESSION_TASKS.length) list=list.concat(OLYMP_SESSION_TASKS);
-  return list.concat(P&&P.customBank?P.customBank:[]);
+  var base=[];
+  if(typeof OLYMP_EXTRA_TASKS!=="undefined"&&OLYMP_EXTRA_TASKS.length) base=base.concat(OLYMP_EXTRA_TASKS);
+  if(typeof OLYMP_SESSION_TASKS!=="undefined"&&OLYMP_SESSION_TASKS.length) base=base.concat(OLYMP_SESSION_TASKS);
+  if(P&&P.customBank&&P.customBank.length) base=base.concat(P.customBank);
+  // применить переопределения от админа (правки существующих задач)
+  var over=taskOverrides();
+  var merged=[];
+  base.forEach(function(t){
+    if(over[t.id]) merged.push(over[t.id]); else merged.push(t);
+  });
+  return merged;
 }
 function extraStateKey(id){ return "x_"+id; }
 function renderBank(){
@@ -1166,7 +1173,11 @@ function renderBank(){
   var html="", groups={};
   filtered.forEach(function(t){ groups[t.module]=groups[t.module]||[]; groups[t.module].push(t); });
   OLYMP_MODULES.forEach(function(m){ if(!groups[m.id])return;
-    html+='<div class="bank-section"><div class="bs-head" style="border-color:'+m.color+'"><span class="bs-dot" style="background:'+m.color+'"></span><h3>'+m.no+'. '+m.name+'</h3></div>';
+    if(m.id==="session"){
+      html+='<div class="bank-section session-section"><div class="bs-head" style="border-color:#0e7ab8"><span class="bs-dot" style="background:#0e7ab8"></span><h3>❄️ СЕССИЯ</h3></div>';
+    } else {
+      html+='<div class="bank-section"><div class="bs-head" style="border-color:'+m.color+'"><span class="bs-dot" style="background:'+m.color+'"></span><h3>'+m.no+'. '+m.name+'</h3></div>';
+    }
     groups[m.id].forEach(function(t){ html+=renderBtask(t); });
     html+='</div>';
   });
@@ -1197,7 +1208,8 @@ function renderBtask(t){
   } else {
     html+='<div class="bt-ans"><input id="bans_'+t.id+'" value="'+escapeHtml(st.answer||"")+'" placeholder="Твой ответ…" '+(locked?'disabled':'')+'></div>';
   }
-  html+='<div class="bt-btnrow"><button class="btn btn-sm btn-primary bcheck" data-task="'+t.id+'" '+(locked?'disabled':'')+'>Проверить</button><button class="btn btn-sm bsolbtn" data-task="'+t.id+'">Решение</button></div>';
+  html+='<div class="bt-btnrow"><button class="btn btn-sm btn-primary bcheck" data-task="'+t.id+'" '+(locked?'disabled':'')+'>Проверить</button><button class="btn btn-sm bsolbtn" data-task="'+t.id+'">Решение</button>'
+    +(canEditBankTask()?'<button class="btn btn-sm bedit" data-task="'+t.id+'">✏️ Изменить</button>':'')+'</div>';
   if(st.status==="ok") html+='<div class="bt-status bt-state-ok">✅ Верно!</div>';
   else if(st.status==="wrong") html+='<div class="bt-status bt-state-bad">❌ Неверно</div>';
   html+='<div class="bt-solution" id="bsol_'+t.id+'" style="display:'+(st.status==="ok"?"block":"none")+'"><b>Решение:</b> '+escapeHtml(t.solution||"")+'</div>';
@@ -1214,6 +1226,7 @@ function bindBtaskEvents(){
   }); });
   $$(".bcheck").forEach(function(b){ b.addEventListener("click",function(){ checkExtraTask(b.getAttribute("data-task")); }); });
   $$(".bsolbtn").forEach(function(b){ b.addEventListener("click",function(){ var id=b.getAttribute("data-task"); var s=$("#bsol_"+id); if(s) s.style.display=s.style.display==="none"?"block":"none"; }); });
+  $$(".bedit").forEach(function(b){ b.addEventListener("click",function(e){ e.stopPropagation(); var id=b.getAttribute("data-task"); if(!canEditBankTask()){ toast("Нет прав"); return; } openTaskEditor(id, ""); }); });
 }
 function checkExtraTask(id){
   var t=extraTasks().filter(function(x){return x.id===id;})[0]; if(!t) return;
@@ -1234,19 +1247,62 @@ $$(".bank-filters .chip").forEach(function(c){ c.addEventListener("click",functi
 /* ---------- Добавление задачи (админ/банк) ---------- */
 var taskModal=function(open){ $("#task-modal").hidden=!open; if(open) fillModuleSelect(); document.body.style.overflow=open?"hidden":""; };
 function fillModuleSelect(){ var sel=$("#tf-module"); sel.innerHTML=""; OLYMP_MODULES.forEach(function(m){ var o=document.createElement("option"); o.value=m.id; o.textContent=m.no+". "+m.name; sel.appendChild(o); }); if(bankModuleFilter!=="all") sel.value=bankModuleFilter; }
-$("#bank-add").addEventListener("click",function(){ if(!currentUser()){ toast("Войди в аккаунт"); return; } taskModal(true); });
+$("#bank-add").addEventListener("click",function(){ if(!currentUser()){ toast("Войди в аккаунт"); return; }
+    EDIT_TASK_ID=null;
+    $("#task-modal .modal-head h3").textContent="Добавить задачу в банк";
+    $("#tf-text").value=""; $("#tf-answer").value=""; $("#tf-solution").value=""; $("#tf-options").value="";
+    $("#options-row").hidden=true;
+    $("#tf-type").value="calc"; $("#tf-level").value="active";
+    taskModal(true); });
 $("#tm-close").addEventListener("click",function(){ taskModal(false); });
 $("#tm-cancel").addEventListener("click",function(){ taskModal(false); });
 $("#task-modal").addEventListener("click",function(e){ if(e.target===this)taskModal(false); });
 $("#tf-type").addEventListener("change",function(){ $("#options-row").hidden=$("#tf-type").value!=="test"; });
+var EDIT_TASK_ID=null;
+function taskOverrides(){ var c=getContent(); if(!c.taskOverrides) c.taskOverrides={}; return c; }
+function saveTaskOverrides(o){ var c=getContent(); c.taskOverrides=o; saveContent(c); }
+function effectiveTasksFromBank(src, id){
+  var over=taskOverrides();
+  if(over[id]) return over[id];
+  if(src==="custom"){ return (P&&P.customBank||[]).filter(function(x){return x.id===id;})[0]||null; }
+  return null;
+}
+function canEditBankTask(){ var u=currentUser(); return !!(u&&(u.role==="admin"||u.role==="teacher")); }
 $("#task-form").addEventListener("submit",function(e){ e.preventDefault();
   var module=$("#tf-module").value, level=$("#tf-level").value, type=$("#tf-type").value;
   var text=$("#tf-text").value.trim(), ans=$("#tf-answer").value.trim(), sol=$("#tf-solution").value.trim();
   if(!text||!ans){ toast("Заполни условие и ответ"); return; }
-  var id="u"+Date.now().toString(36); var t={id:id,module:module,level:level,type:type,text:text,answer:ans,solution:sol};
+  var t={id:EDIT_TASK_ID||("u"+Date.now().toString(36)),module:module,level:level,type:type,text:text,answer:ans,solution:sol};
   if(type==="test"){ var opts=$("#tf-options").value.split(";").map(function(s){return s.trim();}).filter(Boolean); if(opts.length&&opts.indexOf(ans)<0)opts.push(ans); if(opts.length)t.options=opts; }
-  P.customBank=P.customBank.concat([t]); saveProgress(); taskModal(false); renderBank(); fillBankModuleFilter(); toast("Задача добавлена");
+  if(EDIT_TASK_ID){
+    // правка существующей: кладём переопределение в content.taskOverrides (работает и для session, и для обычного банка)
+    var over=taskOverrides(); over[EDIT_TASK_ID]=t; saveTaskOverrides(over);
+    toast("Задача обновлена");
+  } else {
+    P.customBank=P.customBank.concat([t]); saveProgress();
+    toast("Задача добавлена");
+  }
+  EDIT_TASK_ID=null; taskModal(false); renderBank(); fillBankModuleFilter();
 });
+function openTaskEditor(id, src){
+  var base=null;
+  if(src==="custom") base=(P&&P.customBank||[]).filter(function(x){return x.id===id;})[0]||null;
+  else { var allBanks=(typeof OLYMP_TASKS!=="undefined"?OLYMP_TASKS:[]).concat(typeof OLYMP_EXTRA_TASKS!=="undefined"?OLYMP_EXTRA_TASKS:[]).concat(typeof OLYMP_SESSION_TASKS!=="undefined"?OLYMP_SESSION_TASKS:[]); base=allBanks.filter(function(x){return x.id===id;})[0]||null; }
+  var eff=effectiveTasksFromBank(src,id)||base;
+  if(!eff){ toast("Задача не найдена"); return; }
+  EDIT_TASK_ID=id;
+  $("#tf-module").value=eff.module||"session";
+  $("#tf-level").value=eff.level||"base";
+  $("#tf-type").value=eff.type||"calc";
+  $("#tf-text").value=eff.text||"";
+  $("#tf-answer").value=eff.answer||"";
+  $("#tf-solution").value=eff.solution||"";
+  $("#tf-options").value=(eff.options||[]).filter(function(o){return o!==eff.answer;}).join("; ");
+  $("#options-row").hidden=(eff.type||"calc")!=="test";
+  $("#tf-module").closest(".form-row").querySelector("label").textContent="Блок";
+  var head=$("#task-modal .modal-head h3"); if(head) head.textContent="Изменить задачу в банке";
+  taskModal(true);
+}
 
 /* ---------- Пробная олимпиада (доступ — только после всех модулей) ---------- */
 var lastOlymp={tasks:null};

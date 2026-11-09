@@ -673,10 +673,17 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .p-badge.bO{background:var(--gold)}
 .control-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin:10px 0}
 .control-actions .filter-select{width:auto}
-.pinned-wrap{margin-bottom:8px}
-.pinned-label{font-size:12px;font-weight:800;color:#0e7ab8;margin:6px 2px 8px}
-.pinned-grid{grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
-.pinned-tile{border-style:dashed;box-shadow:0 0 0 1px rgba(14,122,184,.12)}
+/* Блок «Зимняя сессия» — полоса сверху */
+.session-banner{display:flex;align-items:center;gap:16px;color:#fff;border-radius:16px;padding:16px 20px;margin-bottom:14px;cursor:pointer;box-shadow:0 6px 18px rgba(14,122,184,.25);transition:.15s;flex-wrap:wrap}
+.session-banner:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(14,122,184,.32)}
+.session-banner .sb-icon{font-size:34px;flex:none}
+.session-banner .sb-body{flex:1;min-width:200px}
+.session-banner .sb-title{font-size:20px;font-weight:800;letter-spacing:-.3px}
+.session-banner .sb-desc{font-size:13px;opacity:.9;margin-top:2px}
+.session-banner .sb-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.session-banner .sb-state{font-size:12px;font-weight:700;background:rgba(255,255,255,.18);padding:4px 10px;border-radius:20px}
+.session-banner .sb-prog{font-size:16px;font-weight:800}
+.session-banner .sb-btn{background:#fff;color:#0e7ab8;border:none;font-weight:700}
 .ticket-theory{background:#f5f8fc;border:1px solid #d5e4f2;border-radius:10px;padding:12px 14px;margin:8px 0}
 .ticket-theory h4{margin:0 0 8px}
 .ticket-theory .tk-body{font-size:14px;line-height:1.55;color:var(--ink)}
