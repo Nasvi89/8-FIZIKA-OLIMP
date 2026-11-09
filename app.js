@@ -28,7 +28,7 @@ function getClasses(){ return storeGet(K.classes,[]); }
 function saveClasses(c){ storeSet(K.classes,c); dbPush("classes", c); }
 // Домашка: [{id,className,title,text,author,date}]
 function getHomework(){ return storeGet(K.homework,[]); }
-function saveHomework(h){ storeSet(K.homework,h); }
+function saveHomework(h){ storeSet(K.homework,h); dbPush("homework", h); }
 // Контент модулей (переопределения): olymp8_content[moduleId] = { conspect?, videoName?, videoBase64? }
 function getContent(){ return storeGet(K.content,{}); }
 function saveContent(c){ storeSet(K.content,c); }
@@ -120,7 +120,7 @@ function olympChipText(o){ return o&&o.mp ? "МинПрос" : ("Уровень 
 // Отметки: olymp8_olympiads = { className: { <index олимпиады>: { login: true } } }
 var OLYM_KEY="olymp8_olympiads";
 function getOlympMarks(){ return storeGet(OLYM_KEY,{}); }
-function saveOlympMarks(m){ storeSet(OLYM_KEY,m); }
+function saveOlympMarks(m){ storeSet(OLYM_KEY,m); dbPush("olympmarks", m); }
 function olympClassOf(u){
   // определяем имя класса: у учителя/админа — его группа, у ученика — его класс
   if(!u) return "";
@@ -1887,17 +1887,35 @@ function renderClassKR(cls, u){
 var LAST_KR=null; // { scope, v1, v2, clsName }
 function krScopeOptions(){
   var sels='<span class="fsep">Материал КР:</span>'
-    +'<select id="kr-module" class="filter-select"><option value="all">Все блоки</option>';
+    +'<select id="kr-module" class="filter-select" multiple size="7" style="min-width:250px">'
+    +'<option value="all" selected>Все блоки</option>';
   OLYMP_MODULES.forEach(function(m){ sels+='<option value="'+escAttr(m.id)+'">'+escapeHtml(m.name)+'</option>'; });
-  sels+='</select>';
+  sels+='</select>'
+    +'<span class="fsep">удерживай Ctrl (⌘) для выбора нескольких тем</span>';
   sels+='<select id="kr-level" class="filter-select"><option value="all">Все уровни</option>'
     +'<option value="base">База</option><option value="active">Актив</option><option value="olimp">Олимп</option></select>';
   return sels;
 }
+// Считывает выбранные темы из мультиселекта #kr-module. Возвращает массив id или ["all"].
+function selectedKRModules(){
+  var sel=$("#kr-module"); if(!sel) return ["all"];
+  var out=[];
+  for(var i=0;i<sel.options.length;i++){
+    if(sel.options[i].selected){ out.push(sel.options[i].value); }
+  }
+  if(!out.length) out=["all"];
+  return out;
+}
 function cramTasks(scope){
-  // Все задачи банка с фильтром scope: {moduleId, level}
+  // Все задачи банка с фильтром scope: {moduleId (строка или массив), level}
   var out=allTasks().filter(function(t){ return t.id && (t.module||t.theme); });
-  if(scope.moduleId && scope.moduleId!=="all") out=out.filter(function(t){ return t.module===scope.moduleId || (t.theme&&t.theme.indexOf(scope.moduleId+"__")===0); });
+  var mods=scope.moduleId;
+  if(mods && mods!=="all"){
+    if(!Array.isArray(mods)) mods=[mods];
+    if(mods.indexOf("all")<0){
+      out=out.filter(function(t){ return mods.indexOf(t.module)>=0 || (t.theme&&mods.some(function(mid){ return t.theme.indexOf(mid+"__")===0; })); });
+    }
+  }
   if(scope.level && scope.level!=="all") out=out.filter(function(t){ return t.level===scope.level; });
   return out;
 }
@@ -1929,7 +1947,7 @@ function renderClassKRBank(cls, u){
   var stt=$("#krstatT"); if(stt) stt.textContent=list.length;
 
   function renderList(){
-    var s={moduleId:$("#kr-module")?$("#kr-module").value:"all", level:$("#kr-level")?$("#kr-level").value:"all"};
+    var s={moduleId:selectedKRModules(), level:$("#kr-level")?$("#kr-level").value:"all"};
     var arr=cramTasks(s);
     var h="";
     if(!arr.length){ h='<div class="muted" style="padding:10px">Нет задач по этому фильтру.</div>'; }
@@ -2013,7 +2031,7 @@ function renderMakeKR(cls, u){
   renderOut();
 
   $("#kr-gen").addEventListener("click",function(){
-    var scope={ moduleId:$("#kr-module")?$("#kr-module").value:"all", level:"all" };
+    var scope={ moduleId:selectedKRModules(), level:"all" };
     var kr=makeKRPick(scope);
     if(!kr) return;
     LAST_KR=kr; LAST_KR.clsName=cls?cls.name:"";
@@ -2091,7 +2109,7 @@ function renderClassStats(cls, u){
     var p=classProgressFor(st.login)||{xp:0,correctTotal:0};
     var xp=p.xp||0, solved=p.correctTotal||0, olymp=olympCountForLogin(st.login, cls.name);
     sumXP+=xp; sumSolved+=solved; sumOlymp+=olymp;
-    var pct=moduleProgressForUser(p,"kin");
+    var pct=moduleProgressForUser(p,"hydro");
     var totalPct=0, mods=OLYMP_MODULES.length, acc=0;
     OLYMP_MODULES.forEach(function(m){ acc+=moduleProgressForUser(p,m.id); });
     var avgPct=mods?Math.round(acc/mods):0;
