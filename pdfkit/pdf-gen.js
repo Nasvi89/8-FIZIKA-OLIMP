@@ -102,7 +102,75 @@ window.OLYMP_buildControlPdf=function(opts){
     .then(function(bytes){ window.__downloadPdfBytes(bytes, opts.fileName||"Контрольная_работа.pdf"); });
 };
 
-/* ============ PDF: банк задач ============ */
+/* ============ PDF: билеты сессии (2 комплекта) ============ */
+// opts: { set1:[{topic:{name,body,desc},tasks:[{text,options?,answer?}]}], set2:[...], clsName, fileName }
+window.OLYMP_buildTicketsPdf=function(opts){
+  return pdfDoc().then(function(ctx){
+    var doc=ctx.doc, font=ctx.font, W=595.28, H=841.89, M=42, cw=W-2*M;
+    var rgb=ctx.rgb, ink=rgb(0.12,0.15,0.28), inkSoft=rgb(0.32,0.36,0.55), accent=rgb(0.27,0.42,0.88), line=rgb(0.80,0.83,0.91), band=rgb(0.95,0.96,0.995), white=rgb(1,1,1);
+
+    function drawHeader(page, label, clsName){
+      var y=H-40;
+      page.drawRectangle({x:0,y:H-70,width:W,height:70,color:band});
+      page.drawLine({start:{x:0,y:H-70},end:{x:W,y:H-70},thickness:2,color:accent});
+      var title="Билеты по физике \u00B7 8 класс \u00B7 Зимняя сессия";
+      var thsize = font.widthOfTextAtSize(title,13.5)>cw ? 11 : 13.5;
+      wrapText(font,title,cw,thsize).forEach(function(ln){ page.drawText(esc(ln),{x:W/2-font.widthOfTextAtSize(ln,thsize)/2,y:y,size:thsize,color:ink,font:font}); y-=16; });
+      var sub=(clsName?"Класс: "+clsName+"    \u00B7    ":"")+label;
+      page.drawText(esc(sub),{x:W/2-font.widthOfTextAtSize(sub,9.5)/2,y:y,size:9.5,color:inkSoft,font:font});
+      page.drawLine({start:{x:M,y:y-14},end:{x:M+cw,y:y-14},thickness:1,color:line});
+      return y-20;
+    }
+
+    var page=null, y=0;
+    function addPage(){
+      page=doc.addPage(ctx.A4); y=H-56; return page;
+    }
+    // вспомогательная: рисует один билет
+    function drawTicket(t, num){
+      var padded=num<10?("0"+num):String(num);
+      // заголовок билета
+      var titleH=12.5;
+      if(y<60){ page=addPage(); }
+      page.drawRectangle({x:M,y:y-3,width:cw,height:22,color:rgb(0.955,0.965,0.995)});
+      page.drawLine({start:{x:M,y:y-3},end:{x:W-M,y:y-3},thickness:1.2,color:accent});
+      page.drawText(esc("\u0411\u0438\u043b\u0435\u0442 "+padded),{x:M+8,y:y,size:12,color:accent,font:font});
+      y-=24;
+      // пункты: 1) тема  2..n) задачи
+      var items=["1. "+t.topic.name];
+      (t.tasks||[]).forEach(function(q,i){ items.push(String(i+2)+". "+q.text); });
+      items.forEach(function(it, idx){
+        var bodyLines=wrapText(font,it,cw-14,9.5);
+        var optLines=[];
+        // варианты ответа, если есть — каждый на своей строке
+        var hasOpts = idx>0 && t.tasks[idx-1] && t.tasks[idx-1].options && t.tasks[idx-1].options.length;
+        if(hasOpts){
+          t.tasks[idx-1].options.forEach(function(o,i){ optLines=optLines.concat(wrapText(font,"  "+String(i+1)+") "+o, cw-24, 9)); });
+        }
+        var needed = 14 + bodyLines.length*12 + optLines.length*11 + 14;
+        if(y<needed+40){ page=addPage(); }
+        bodyLines.forEach(function(ln){ page.drawText(esc(ln),{x:M+7,y:y,size:9.5,color:ink,font:font}); y-=12; });
+        y-=4;
+        optLines.forEach(function(ln){ page.drawText(esc(ln),{x:M+20,y:y,size:9,color:inkSoft,font:font}); y-=11; });
+        y-=2;
+        y-=3;
+      });
+      y-=8;
+      page.drawLine({start:{x:M,y:y},end:{x:M+cw,y:y},thickness:0.4,color:line});
+      y-=14;
+    }
+
+    [[opts.set1,"Комплект 1"],[opts.set2,"Комплект 2"]].forEach(function(pair){
+      var list=pair[0], label=pair[1];
+      if(!list||!list.length) return;
+      addPage();
+      y=drawHeader(page, label, opts.clsName||"");
+      list.forEach(function(t,ti){ drawTicket(t, t.num||(ti+1)); });
+    });
+    return doc;
+  }).then(function(doc){ return doc.save(); })
+    .then(function(bytes){ window.__downloadPdfBytes(bytes, opts.fileName||"Билеты_сессии.pdf"); });
+};
 window.OLYMP_buildBankPdf=function(tasks, title, fileName){
   // tasks: [{text,options?,answer?,level}]
   return pdfDoc().then(function(ctx){

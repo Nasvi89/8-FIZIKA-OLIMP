@@ -425,18 +425,27 @@ function renderModuleWorkspace(){
       // Режим 1: показать только карточки тем
       lh+='<div class="subs-wrap" id="subs-wrap" data-mid="'+mid+'">'
         +'<div class="subs-head"><h3 class="subs-title">📚 Темы блока «'+escapeHtml(m.name)+'»</h3>'
-        +'<div class="subs-count">'+subs.length+' тем</div></div>'
-        +'<p class="muted" style="font-size:13px;margin:4px 0 10px">Выбери тему: внутри будет видео, конспект и задачи.</p>'
-        +'<div class="subs-grid">';
+        +'<div class="subs-count">'+subs.length+' билетов</div></div>'
+        +'<p class="muted" style="font-size:13px;margin:4px 0 10px">Выбери билет: внутри будет теория и задачи по теме.</p>'
+        +(mid==="session"?'<div class="subs-list" id="subs-wrap" data-mid="'+mid+'">':'<div class="subs-grid" id="subs-wrap" data-mid="'+mid+'">');
       subs.forEach(function(s,i){
-        lh+='<div class="sub-card" data-sub="'+i+'">'
-          +'<div class="sc-top"><span class="sc-icon">'+(s.icon||"📘")+'</span>'
-          +(s.tasks&&s.tasks.length?'<span class="sc-open-tag sub-count-badge">'+s.tasks.length+' задач</span>':'')
-          +'</div>'
-          +'<h3 class="sc-name">'+escapeHtml(s.name)+'</h3>'
-          +(s.desc?'<div class="sc-desc">'+escapeHtml(s.desc)+'</div>':'')
-          +'<div class="sc-num">Тема '+(i+1)+'</div>'
-          +'</div>';
+        if(mid==="session"){
+          lh+='<div class="ticket-row" data-sub="'+i+'">'
+            +'<span class="tr-num">'+(i+1)+'</span>'
+            +'<div class="tr-body"><div class="tr-name">'+escapeHtml(s.name)+'</div>'
+            +(s.desc?'<div class="tr-desc">'+escapeHtml(s.desc)+'</div>':'')+'</div>'
+            +'<span class="tr-go">'+((s.tasks&&s.tasks.length)?s.tasks.length+' задач':'')+' →</span>'
+            +'</div>';
+        } else {
+          lh+='<div class="sub-card" data-sub="'+i+'">'
+            +'<div class="sc-top"><span class="sc-icon">'+(s.icon||"📘")+'</span>'
+            +(s.tasks&&s.tasks.length?'<span class="sc-open-tag sub-count-badge">'+s.tasks.length+' задач</span>':'')
+            +'</div>'
+            +'<h3 class="sc-name">'+escapeHtml(s.name)+'</h3>'
+            +(s.desc?'<div class="sc-desc">'+escapeHtml(s.desc)+'</div>':'')
+            +'<div class="sc-num">Тема '+(i+1)+'</div>'
+            +'</div>';
+        }
       });
       lh+='</div></div>';
     } else {
@@ -518,7 +527,7 @@ function renderModuleWorkspace(){
   var nav=$("#subs-wrap");
   if(nav){
     nav.addEventListener("click",function(ev){
-      var c=ev.target.closest?ev.target.closest(".sub-card"):null;
+      var c=ev.target.closest?ev.target.closest(".sub-card, .ticket-row"):null;
       if(!c) return;
       var i=parseInt(c.getAttribute("data-sub"),10);
       currentSubId=i;
@@ -2176,88 +2185,89 @@ function sessionBankTasks(){
   return [];
 }
 var LAST_TICKET=null; // { topic:{name,body}, tasks:[...], clsName }
+var LAST_TICKETS=null; // { set1:[{topic,tasks}...], set2:[...], clsName }
 function renderMakeTickets(cls, u){
   var box=$("#cl-kr-content"); if(!box) return;
   var topics=sessionTopics();
   var data=sessionBankTasks();
-  var html='<div class="panel"><div class="view-head-row"><div class="view-head"><h3>🎫 Составить билет</h3>'
-    +'<p class="muted" style="font-size:12.5px">Билет = теория по выбранной теме сессии + случайные задачи ОГЭ из банка сессии (теория + 2 задачи).</p></div></div>';
+  var html='<div class="panel"><div class="view-head-row"><div class="view-head"><h3>🎫 Составить билеты</h3>'
+    +'<p class="muted" style="font-size:12.5px">Составь 2 комплекта билетов Зимней сессии. Каждый билет = тема (название из программы) + 2 случайные задачи ОГЭ. В одноимённых билетах комплектов задачи — разные.</p></div></div>';
   if(!topics.length){
-    html+='<div class="empty"><span class="big">📭</span>Подтемы сессии не найдены (нет данных lessons).</div></div>';
+    html+='<div class="empty"><span class="big">📭</span>Темы сессии не найдены (нет данных lessons).</div></div>';
     box.innerHTML=html; return;
   }
   html+='<div class="control-actions">'
-    +'<span class="fsep">Тема билета:</span>'
-    +'<select id="tk-topic" class="filter-select" style="min-width:260px">'
-    +topics.map(function(s,i){ return '<option value="'+i+'">'+(i+1)+'. '+escapeHtml(s.name)+'</option>'; }).join("")
-    +'</select>'
-    +'<span class="fsep">Задач:</span>'
+    +'<span class="fsep">Задач в билете:</span>'
     +'<select id="tk-count" class="filter-select"><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option></select>'
-    +'<button class="btn btn-primary" id="tk-gen">Составить билет</button>'
-    +'<button class="btn" id="tk-dl-txt" disabled>Скачать txt</button>'
-    +'<button class="btn" id="tk-dl-pdf" disabled>Скачать PDF</button>'
-    +'<button class="btn" id="tk-print" disabled>Печать</button></div>';
+    +'<span class="fsep">Билетов (начать с):</span>'
+    +'<select id="tk-from" class="filter-select"><option value="1">Билет 1</option></select>'
+    +'<span class="fsep">по:</span>'
+    +'<select id="tk-to" class="filter-select"></select>'
+    +'<button class="btn btn-primary" id="tk-gen">Составить 2 комплекта</button>'
+    +'<button class="btn" id="tk-dl-pdf" disabled>Скачать PDF</button></div>';
   html+='<div id="tk-output" class="control-output"></div></div>';
   box.innerHTML=html;
 
+  var from=$("#tk-from"), to=$("#tk-to");
+  topics.forEach(function(s,i){
+    var o=document.createElement("option"); o.value=String(i+1); o.textContent="Билет "+(i+1); from.appendChild(o);
+    var o2=document.createElement("option"); o2.value=String(i+1); o2.textContent="Билет "+(i+1); to.appendChild(o2);
+  });
+  to.value=String(topics.length);
+
+  function ticketsSlice(idx1, idx2){
+    var a=parseInt(idx1,10)-1, b=parseInt(idx2,10)-1;
+    if(isNaN(a))a=0; if(isNaN(b)||b<a)b=a;
+    return topics.slice(a,b+1);
+  }
+
   function renderOut(){
     var out=$("#tk-output");
-    if(!LAST_TICKET){ out.innerHTML='<div class="empty"><span class="big">🎫</span>Выберите тему и нажмите «Составить билет».</div>'; return; }
-    var T=LAST_TICKET;
-    var h='<div class="ckwork"><h3>Билет: '+escapeHtml(T.topic.name)+'</h3><div class="ck-sub">'+escapeHtml((T.topic.desc||""))+' · теория + '+T.tasks.length+' задач</div>';
-    h+='<div class="ticket-theory"><h4>📖 Теория</h4><div class="tk-body">'+renderConspectText(T.topic.body)+'</div></div>';
-    h+='<div class="ticket-tasks"><h4>✏️ Задачи</h4>';
-    T.tasks.forEach(function(t,i){
-      h+='<div class="ck-q"><div class="qpts">Задача '+(i+1)+' · сессия</div><div class="qtext">'+escapeHtml(t.text)+'</div>'
-        +'<div class="qsol"><b>Ответ:</b> '+escapeHtml(t.answer||"")+'</div></div>';
-    });
-    h+='</div></div>';
+    if(!LAST_TICKETS){ out.innerHTML='<div class="empty"><span class="big">🎫</span>Выберите диапазон билетов и нажмите «Составить 2 комплекта».</div>'; return; }
+    var L=LAST_TICKETS;
+    function block(list,label){
+      var h='<div class="tk-set"><h4>'+label+'</h4>';
+      list.forEach(function(t,ti){
+        h+='<div class="ckwork"><div class="tk-ticket-title">Билет '+t.num+':</div>'
+          +'<div class="tk-row"><span class="tk-idx">1.</span><span class="tk-txt">'+escapeHtml(t.topic.name)+'</span></div>';
+        t.tasks.forEach(function(q,qi){
+          h+='<div class="tk-row"><span class="tk-idx">'+(qi+2)+'.</span><span class="tk-txt">'+escapeHtml(q.text)+'</span></div>';
+        });
+        h+='</div>';
+      });
+      return h+'</div>';
+    }
+    var h='<div class="tk-sets">'+block(L.set1,"Комплект 1")+'<div class="tk-set-div"></div>'+block(L.set2,"Комплект 2")+'</div>';
     out.innerHTML=h;
-    applyMath(out);
   }
   renderOut();
 
   $("#tk-gen").addEventListener("click",function(){
-    var idx=parseInt($("#tk-topic").value,10);
-    var cnt=parseInt($("#tk-count").value,10);
-    var topic=topics[idx]||topics[0];
-    var pool=data.slice();
-    if(!pool.length){ toast("Банк сессии пуст — нет задач"); return; }
-    var picked=shuffle(pool).slice(0,Math.min(cnt,pool.length));
-    LAST_TICKET={ topic:topic, tasks:picked, clsName:cls?cls.name:"" };
-    $("#tk-dl-txt").disabled=false; $("#tk-dl-pdf").disabled=false; $("#tk-print").disabled=false;
-    renderOut(); toast("Билет составлен: теория + "+picked.length+" задач");
-  });
-  $("#tk-dl-txt").addEventListener("click",function(){
-    if(!LAST_TICKET) return;
-    var T=LAST_TICKET;
-    var lines=["БИЛЕТ ПО ФИЗИКЕ · 8 КЛАСС · ЗИМНЯЯ СЕССИЯ","Тема: "+T.topic.name,"","ТЕОРИЯ:"];
-    if(T.topic.body) lines.push(String(T.topic.body).replace(/\$\$.*?\$\$/g,"").replace(/[*#:>]/g,""));
-    lines.push("","ЗАДАЧИ:");
-    T.tasks.forEach(function(t,i){ lines.push((i+1)+". "+t.text+(t.answer?"  → "+t.answer:"")); lines.push(""); });
-    downloadText("Билет_"+safeName(cls?cls.name:"")+"_"+safeName(T.topic.name)+".txt", lines.join("\n"));
+    if(!data.length){ toast("Банк сессии пуст — нет задач"); return; }
+    var cnt=parseInt($("#tk-count").value,10)||2;
+    var sel=ticketsSlice($("#tk-from").value, $("#tk-to").value);
+    if(!sel.length){ toast("Выберите диапазон билетов"); return; }
+    var set1=[], set2=[];
+    sel.forEach(function(topic,ti){
+      var pool=shuffle(data.slice());
+      var need=cnt*2;
+      var max=Math.min(need, pool.length);
+      var picked=pool.slice(0,max);
+      var t1=[], t2=[];
+      for(var k=0;k<cnt;k++){ if(picked[k]) t1.push(picked[k]); if(picked[cnt+k]) t2.push(picked[cnt+k]); }
+      set1.push({num:ti+1, topic:topic, tasks:t1});
+      set2.push({num:ti+1, topic:topic, tasks:t2});
+    });
+    LAST_TICKETS={ set1:set1, set2:set2, clsName:cls?cls.name:"", from:sel[0].num, to:sel[sel.length-1].num };
+    $("#tk-dl-pdf").disabled=false;
+    renderOut(); toast("Составлено 2 комплекта по "+sel.length+" билетов");
   });
   $("#tk-dl-pdf").addEventListener("click",function(){
-    if(!LAST_TICKET){ toast("Сначала составь билет"); return; }
-    if(typeof window.OLYMP_buildControlPdf!=="function"){ toast("Генератор PDF не загружен"); return; }
-    var T=LAST_TICKET;
-    var one={ A:T.tasks.slice(0,Math.ceil(T.tasks.length/2)), B:T.tasks.slice(Math.ceil(T.tasks.length/2)), C:[] };
-    var theme="Билет: "+T.topic.name+" · класс "+(cls?cls.name:"");
-    window.OLYMP_buildControlPdf({ v1:one, v2:{A:[],B:[],C:[]}, theme:theme, fileName:"Билет_"+safeName(T.topic.name)+".pdf" });
-  });
-  $("#tk-print").addEventListener("click",function(){
-    if(!LAST_TICKET){ toast("Сначала составь билет"); return; }
-    var T=LAST_TICKET;
-    var win=window.open("","_blank","width=900,height=700");
-    win.document.write('<html><head><title>Билет</title><style>body{font-family:Georgia,serif;padding:24px;color:#111}h2{text-align:center}.th{border:1px solid #ccc;padding:12px;margin:10px 0}.ts{background:#f5f8fc;padding:12px;margin:10px 0}.q{margin:10px 0}.s{font-size:12px;color:#555}</style></head><body>');
-    win.document.write('<h2>Билет по физике · 8 класс · Зимняя сессия</h2>');
-    win.document.write('<h3>Тема: '+escapeHtml(T.topic.name)+'</h3>');
-    win.document.write('<div class="th"><b>Теория:</b><br>'+escapeHtml(String(T.topic.body||"").replace(/[*#:>]/g,""))+'</div>');
-    win.document.write('<div class="ts"><b>Задачи:</b>');
-    T.tasks.forEach(function(t,i){ win.document.write('<div class="q">'+(i+1)+'. '+escapeHtml(t.text)+'</div>'); });
-    win.document.write('</div>');
-    win.document.write('</body></html>');
-    win.document.close(); win.focus(); win.print();
+    if(!LAST_TICKETS){ toast("Сначала составь комплекты"); return; }
+    if(typeof window.OLYMP_buildTicketsPdf!=="function"){ toast("Генератор PDF не загружен"); return; }
+    var L=LAST_TICKETS;
+    var fname="Билеты_"+safeName(L.clsName||"сессия")+"_"+(L.from||1)+"-"+(L.to||L.set1.length)+".pdf";
+    window.OLYMP_buildTicketsPdf({ set1:L.set1, set2:L.set2, clsName:L.clsName, fileName:fname });
   });
 }
 
