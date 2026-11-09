@@ -149,8 +149,11 @@ window.OLYMP_buildTicketsPdf=function(opts){
     }
     // рисует один билет (целиком на одной странице, без разрыва)
     function drawTicket(t, num){
+      // высота темы (пункт 1)
+      var tl=wrapText(font,"1. "+t.topic.name,cw-14,9.5);
+      var themeH=tl.length*12 + 6;
       // считаем полную высоту билета заранее
-      var headH=22, totalH=headH+20;
+      var totalH=22 + 20 + themeH;
       (t.tasks||[]).forEach(function(q){
         var st=splitTable(q.text||"");
         var bodyLines=wrapText(font,st.text,cw-14,9.5);
@@ -170,7 +173,7 @@ window.OLYMP_buildTicketsPdf=function(opts){
       });
       totalH+=14;
       // если билет не влезает целиком — новая страница
-      if(y+totalH>H-60){ addPage(); }
+      if(y+totalH>H-50){ addPage(); }
       // заголовок «Билет N»
       var padded=num<10?("0"+num):String(num);
       page.drawRectangle({x:M,y:y-3,width:cw,height:22,color:rgb(0.955,0.965,0.995)});
@@ -178,7 +181,6 @@ window.OLYMP_buildTicketsPdf=function(opts){
       page.drawText(esc("\u0411\u0438\u043b\u0435\u0442 "+padded),{x:M+8,y:y,size:12,color:accent,font:font});
       y-=24;
       // пункт 1: тема (название)
-      var tl=wrapText(font,"1. "+t.topic.name,cw-14,9.5);
       tl.forEach(function(ln){ page.drawText(esc(ln),{x:M+7,y:y,size:9.5,color:ink,font:font}); y-=12; });
       y-=6;
       // задачи
@@ -189,7 +191,13 @@ window.OLYMP_buildTicketsPdf=function(opts){
         var optLines=[];
         if(q.options&&q.options.length){ q.options.forEach(function(o,i){ optLines=optLines.concat(wrapText(font,"  "+String(i+1)+") "+o,cw-24,9)); }); }
         var imgH=0; var imgR=imgCache[String(q.image&&(Array.isArray(q.image)?q.image[0]:q.image))||""];
-        if(imgR&&imgR.img){ imgH=Math.min(200, (200*(imgR.h||1))/(imgR.w||1)); }
+        var drawW=0, drawH=0;
+        if(imgR&&imgR.img){
+          drawW=Math.min(240, cw-14);
+          drawH=drawW*(imgR.h)/(imgR.w||1);
+          if(drawH>220){ drawH=220; drawW=drawH*(imgR.w)/(imgR.h||1); }
+          imgH=drawH+12;
+        }
         bodyLines.forEach(function(ln){ page.drawText(esc(ln),{x:M+7,y:y,size:9.5,color:ink,font:font}); y-=12; });
         y-=3;
         // таблица
@@ -213,11 +221,10 @@ window.OLYMP_buildTicketsPdf=function(opts){
         }
         optLines.forEach(function(ln){ page.drawText(esc(ln),{x:M+20,y:y,size:9,color:inkSoft,font:font}); y-=11; });
         y-=4;
-        // картинка
+        // картинка (масштабируем под свободное место, чтобы не вылезать за низ)
         if(imgR&&imgR.img){
-          var drawW=Math.min(240, cw-14);
-          var drawH=drawW*(imgR.h)/(imgR.w||1);
-          if(drawH>220){ drawH=220; drawW=drawH*(imgR.w)/(imgR.h||1); }
+          var avail=y-(H-50);
+          if(avail<drawH+20){ drawH=Math.max(60,avail-20); drawW=drawH*(imgR.w)/(imgR.h||1); }
           page.drawImage(imgR.img,{x:M+10,y:y-drawH,width:drawW,height:drawH});
           y-=drawH+10;
         }
