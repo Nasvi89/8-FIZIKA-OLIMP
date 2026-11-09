@@ -147,17 +147,38 @@ window.OLYMP_buildTicketsPdf=function(opts){
       });
       return { rows:rows, text:parts.join("\n").trim() };
     }
-    // рисует один билет
+    // рисует один билет (целиком на одной странице, без разрыва)
     function drawTicket(t, num){
+      // считаем полную высоту билета заранее
+      var headH=22, totalH=headH+20;
+      (t.tasks||[]).forEach(function(q){
+        var st=splitTable(q.text||"");
+        var bodyLines=wrapText(font,st.text,cw-14,9.5);
+        if(bodyLines.length===0) bodyLines=[""];
+        totalH+=bodyLines.length*12;
+        totalH+=8;
+        if(q.options&&q.options.length){ totalH+=q.options.length*11; }
+        totalH+=4;
+        totalH+=(st.rows.length? st.rows.length*13+6:0);
+        var imgR=imgCache[String(q.image&&(Array.isArray(q.image)?q.image[0]:q.image))||""];
+        if(imgR&&imgR.img){
+          var iw=Math.min(240,cw-14), ih=iw*(imgR.h)/(imgR.w||1);
+          if(ih>220){ ih=220; }
+          totalH+=ih+12;
+        }
+        totalH+=10;
+      });
+      totalH+=14;
+      // если билет не влезает целиком — новая страница
+      if(y+totalH>H-60){ addPage(); }
+      // заголовок «Билет N»
       var padded=num<10?("0"+num):String(num);
-      if(y<60){ page=addPage(); }
       page.drawRectangle({x:M,y:y-3,width:cw,height:22,color:rgb(0.955,0.965,0.995)});
       page.drawLine({start:{x:M,y:y-3},end:{x:W-M,y:y-3},thickness:1.2,color:accent});
       page.drawText(esc("\u0411\u0438\u043b\u0435\u0442 "+padded),{x:M+8,y:y,size:12,color:accent,font:font});
       y-=24;
       // пункт 1: тема (название)
       var tl=wrapText(font,"1. "+t.topic.name,cw-14,9.5);
-      if(y<tl.length*12+50){ page=addPage(); }
       tl.forEach(function(ln){ page.drawText(esc(ln),{x:M+7,y:y,size:9.5,color:ink,font:font}); y-=12; });
       y-=6;
       // задачи
@@ -169,8 +190,6 @@ window.OLYMP_buildTicketsPdf=function(opts){
         if(q.options&&q.options.length){ q.options.forEach(function(o,i){ optLines=optLines.concat(wrapText(font,"  "+String(i+1)+") "+o,cw-24,9)); }); }
         var imgH=0; var imgR=imgCache[String(q.image&&(Array.isArray(q.image)?q.image[0]:q.image))||""];
         if(imgR&&imgR.img){ imgH=Math.min(200, (200*(imgR.h||1))/(imgR.w||1)); }
-        var needed = 14 + bodyLines.length*12 + optLines.length*11 + (st.rows.length? st.rows.length*13+8:0) + imgH + 14;
-        if(y<needed+40){ page=addPage(); }
         bodyLines.forEach(function(ln){ page.drawText(esc(ln),{x:M+7,y:y,size:9.5,color:ink,font:font}); y-=12; });
         y-=3;
         // таблица
@@ -199,7 +218,6 @@ window.OLYMP_buildTicketsPdf=function(opts){
           var drawW=Math.min(240, cw-14);
           var drawH=drawW*(imgR.h)/(imgR.w||1);
           if(drawH>220){ drawH=220; drawW=drawH*(imgR.w)/(imgR.h||1); }
-          if(y<drawH+30){ page=addPage(); }
           page.drawImage(imgR.img,{x:M+10,y:y-drawH,width:drawW,height:drawH});
           y-=drawH+10;
         }
@@ -218,7 +236,9 @@ window.OLYMP_buildTicketsPdf=function(opts){
         var list=pair[0], label=pair[1];
         if(!list||!list.length) return;
         addPage();
-        y=drawHeader(page, label, opts.clsName||"");
+        // компактная пометка комплекта (вместо большой шапки)
+        page.drawText(esc(label+(opts.clsName?("  \u00B7  "+opts.clsName):"")),{x:M,y:y,size:10,color:accent,font:font});
+        y-=14;
         list.forEach(function(t,ti){ drawTicket(t, t.num||(ti+1)); });
       });
       return doc;
