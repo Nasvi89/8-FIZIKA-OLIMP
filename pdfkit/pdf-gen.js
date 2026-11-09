@@ -147,92 +147,96 @@ window.OLYMP_buildTicketsPdf=function(opts){
       });
       return { rows:rows, text:parts.join("\n").trim() };
     }
-    // рисует один билет (целиком на одной странице, без разрыва)
+    // рисует один билет: тема + задачи, перенос на новую страницу ЦЕЛИКИМ фрагментом,
+    // если фрагмент не влезает (билет может занять 1-2 страницы, но никогда не обрезается и не ломается посреди задачи)
     function drawTicket(t, num){
-      // высота темы (пункт 1)
-      var tl=wrapText(font,"1. "+t.topic.name,cw-14,9.5);
-      var themeH=tl.length*12 + 6;
-      // считаем полную высоту билета заранее
-      var totalH=22 + 20 + themeH;
-      (t.tasks||[]).forEach(function(q){
-        var st=splitTable(q.text||"");
-        var bodyLines=wrapText(font,st.text,cw-14,9.5);
-        if(bodyLines.length===0) bodyLines=[""];
-        totalH+=bodyLines.length*12;
-        totalH+=8;
-        if(q.options&&q.options.length){ totalH+=q.options.length*11; }
-        totalH+=4;
-        totalH+=(st.rows.length? st.rows.length*13+6:0);
-        var imgR=imgCache[String(q.image&&(Array.isArray(q.image)?q.image[0]:q.image))||""];
-        if(imgR&&imgR.img){
-          var iw=Math.min(240,cw-14), ih=iw*(imgR.h)/(imgR.w||1);
-          if(ih>220){ ih=220; }
-          totalH+=ih+12;
-        }
-        totalH+=10;
-      });
-      totalH+=14;
-      // если билет не влезает целиком — новая страница
-      if(y+totalH>H-50){ addPage(); }
-      // заголовок «Билет N»
       var padded=num<10?("0"+num):String(num);
-      page.drawRectangle({x:M,y:y-3,width:cw,height:22,color:rgb(0.955,0.965,0.995)});
-      page.drawLine({start:{x:M,y:y-3},end:{x:W-M,y:y-3},thickness:1.2,color:accent});
-      page.drawText(esc("\u0411\u0438\u043b\u0435\u0442 "+padded),{x:M+8,y:y,size:12,color:accent,font:font});
-      y-=24;
-      // пункт 1: тема (название)
-      tl.forEach(function(ln){ page.drawText(esc(ln),{x:M+7,y:y,size:9.5,color:ink,font:font}); y-=12; });
-      y-=6;
+      var bottomLimit=H-56;
+      function needNew(h){ return y-h < bottomLimit; }
+      // готовим фрагменты билета
+      var pieces=[];
+      pieces.push({ kind:"title", text:("Билет "+padded), lines:[] });
+      // тема (пункт 1)
+      var tl=wrapText(font,"1. "+t.topic.name,cw-14,9.5);
+      tl.unshift(""); // пустой отступ перед темой? нет — просто строки
+      pieces.push({ kind:"theme", lines:tl });
       // задачи
       (t.tasks||[]).forEach(function(q,qi){
         var label=String(qi+2)+". ";
         var st=splitTable(q.text||"");
         var bodyLines=wrapText(font,label+st.text,cw-14,9.5);
+        if(!bodyLines.length) bodyLines=[""];
         var optLines=[];
         if(q.options&&q.options.length){ q.options.forEach(function(o,i){ optLines=optLines.concat(wrapText(font,"  "+String(i+1)+") "+o,cw-24,9)); }); }
-        var imgH=0; var imgR=imgCache[String(q.image&&(Array.isArray(q.image)?q.image[0]:q.image))||""];
-        var drawW=0, drawH=0;
+        var imgR=imgCache[String(q.image&&(Array.isArray(q.image)?q.image[0]:q.image))||""];
+        var drawW=0,drawH=0;
         if(imgR&&imgR.img){
-          drawW=Math.min(240, cw-14);
-          drawH=drawW*(imgR.h)/(imgR.w||1);
+          drawW=Math.min(240,cw-14); drawH=drawW*(imgR.h)/(imgR.w||1);
           if(drawH>220){ drawH=220; drawW=drawH*(imgR.w)/(imgR.h||1); }
-          imgH=drawH+12;
         }
-        bodyLines.forEach(function(ln){ page.drawText(esc(ln),{x:M+7,y:y,size:9.5,color:ink,font:font}); y-=12; });
-        y-=3;
-        // таблица
-        if(st.rows.length){
-          var colw=cw-14;
-          var rowH=13;
-          st.rows.forEach(function(r){
-            var x=M+12;
-            var cellw=colw/(r.length||1);
-            r.forEach(function(cell){
-              page.drawText(esc(cell),{x:x+2,y:y,size:8.5,color:ink,font:font});
-              page.drawLine({start:{x:x,y:y-3},end:{x:x+cellw,y:y-3},thickness:0.4,color:line});
-              page.drawLine({start:{x:x,y:y-3},end:{x:x,y:y-rowH},thickness:0.4,color:line});
-              x+=cellw;
-            });
-            page.drawLine({start:{x:M+12+colw,y:y-3},end:{x:M+12+colw,y:y-rowH},thickness:0.4,color:line});
-            page.drawLine({start:{x:M+12,y:y-rowH},end:{x:M+12+colw,y:y-rowH},thickness:0.4,color:line});
-            y-=rowH;
-          });
-          y-=5;
-        }
-        optLines.forEach(function(ln){ page.drawText(esc(ln),{x:M+20,y:y,size:9,color:inkSoft,font:font}); y-=11; });
-        y-=4;
-        // картинка (масштабируем под свободное место, чтобы не вылезать за низ)
-        if(imgR&&imgR.img){
-          var avail=y-(H-50);
-          if(avail<drawH+20){ drawH=Math.max(60,avail-20); drawW=drawH*(imgR.w)/(imgR.h||1); }
-          page.drawImage(imgR.img,{x:M+10,y:y-drawH,width:drawW,height:drawH});
-          y-=drawH+10;
-        }
-        y-=4;
+        pieces.push({ kind:"task", bodyLines:bodyLines, optLines:optLines, rows:st.rows, imgR:imgR, drawW:drawW, drawH:drawH });
       });
-      y-=8;
-      page.drawLine({start:{x:M,y:y},end:{x:M+cw,y:y},thickness:0.4,color:line});
-      y-=14;
+
+      // функция отрисовки одного фрагмента
+      function drawPiece(p){
+        if(p.kind==="title"){
+          if(needNew(26)) addPage();
+          page.drawRectangle({x:M,y:y-3,width:cw,height:22,color:rgb(0.955,0.965,0.995)});
+          page.drawLine({start:{x:M,y:y-3},end:{x:W-M,y:y-3},thickness:1.2,color:accent});
+          page.drawText(esc(p.text),{x:M+8,y:y,size:12,color:accent,font:font});
+          y-=26;
+          return;
+        }
+        if(p.kind==="theme"){
+          if(needNew(p.lines.length*12+20)) addPage();
+          p.lines.forEach(function(ln){ page.drawText(esc(ln),{x:M+7,y:y,size:9.5,color:ink,font:font}); y-=12; });
+          y-=8;
+          return;
+        }
+        if(p.kind==="task"){
+          // высота фрагмента задачи
+          var h=10 + p.bodyLines.length*12 + p.optLines.length*11;
+          if(p.rows.length) h+=p.rows.length*13+6;
+          if(p.imgR&&p.imgR.img) h+=p.drawH+12;
+          h+=16;
+          if(needNew(h)) addPage();
+          p.bodyLines.forEach(function(ln){ page.drawText(esc(ln),{x:M+7,y:y,size:9.5,color:ink,font:font}); y-=12; });
+          y-=3;
+          if(p.rows.length){
+            var colw=cw-14, rowH=13;
+            p.rows.forEach(function(r){
+              var x=M+12;
+              var cellw=colw/(r.length||1);
+              r.forEach(function(cell){
+                page.drawText(esc(cell),{x:x+2,y:y,size:8.5,color:ink,font:font});
+                page.drawLine({start:{x:x,y:y-3},end:{x:x+cellw,y:y-3},thickness:0.4,color:line});
+                page.drawLine({start:{x:x,y:y-3},end:{x:x,y:y-rowH},thickness:0.4,color:line});
+                x+=cellw;
+              });
+              page.drawLine({start:{x:M+12+colw,y:y-3},end:{x:M+12+colw,y:y-rowH},thickness:0.4,color:line});
+              page.drawLine({start:{x:M+12,y:y-rowH},end:{x:M+12+colw,y:y-rowH},thickness:0.4,color:line});
+              y-=rowH;
+            });
+            y-=5;
+          }
+          p.optLines.forEach(function(ln){ page.drawText(esc(ln),{x:M+20,y:y,size:9,color:inkSoft,font:font}); y-=11; });
+          y-=4;
+          if(p.imgR&&p.imgR.img){
+            // подгоняем картинку под оставшееся место страницы целиком
+            var maxH=y-bottomLimit-8;
+            var dH=p.drawH, dW=p.drawW;
+            if(dH>maxH && maxH>30){ dH=maxH; dW=dH*(p.imgR.w)/(p.imgR.h||1); }
+            page.drawImage(p.imgR.img,{x:M+10,y:y-dH,width:dW,height:dH});
+            y-=dH+10;
+          }
+          y-=4;
+        }
+      }
+
+      // рисуем все фрагменты по порядку
+      pieces.forEach(drawPiece);
+      // разделитель билета
+      if(y<H-20){ page.drawLine({start:{x:M,y:y-4},end:{x:M+cw,y:y-4},thickness:0.4,color:line}); y-=12; }
     }
 
     // загружаем все картинки обеих комплектов перед отрисовкой
@@ -243,9 +247,9 @@ window.OLYMP_buildTicketsPdf=function(opts){
         var list=pair[0], label=pair[1];
         if(!list||!list.length) return;
         addPage();
-        // компактная пометка комплекта (вместо большой шапки)
-        page.drawText(esc(label+(opts.clsName?("  \u00B7  "+opts.clsName):"")),{x:M,y:y,size:10,color:accent,font:font});
-        y-=14;
+        // заголовок комплекта рисуем над первым билетом (без отдельной пустой страницы)
+        page.drawText(esc(label+(opts.clsName?("  \u00B7  "+opts.clsName):"")),{x:M,y:y,size:11,color:accent,font:font});
+        y-=16;
         list.forEach(function(t,ti){ drawTicket(t, t.num||(ti+1)); });
       });
       return doc;
