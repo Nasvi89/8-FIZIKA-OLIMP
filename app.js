@@ -1182,6 +1182,7 @@ function renderBank(){
     html+='</div>';
   });
   list.innerHTML=html;
+  applyMath(list);
   bindBtaskEvents();
 }
 function renderBtask(t){
@@ -1191,7 +1192,7 @@ function renderBtask(t){
   var html='<div class="btask '+cls+'" id="bw'+t.id+'"><div class="bt-top">'
     +'<span class="level-badge" style="background:'+olympLvlColor(t.level)+'">'+olympLvlName(t.level)+'</span>'
     +'<span class="type-tag">'+((OLYMP_TYPES.filter(function(x){return x.id===t.type;})[0]||{}).name||t.type)+'</span></div>'
-    +'<div class="bt-q">'+escapeHtml(t.text)+'</div>';
+    +'<div class="bt-q">'+renderConspectText(String(t.text||"").replace(/<\/?[a-z][^>]*>/gi,""))+'</div>';
   var images = t.image ? (Array.isArray(t.image)?t.image:[t.image]) : [];
   images.forEach(function(src){
     html+='<div class="bt-img"><img src="'+escapeHtml(src)+'" style="max-width:100%;height:auto" onerror="this.style.display=\'none\'"></div>';
@@ -1202,7 +1203,7 @@ function renderBtask(t){
     (t.options||[]).forEach(function(o,i){
       var sel=(st.selected===i);
       var extra = st.status==="ok" ? (i===correctOptIndex(t)?' correct':(st.selected===i?' incorrect':'')) : '';
-      html+='<div class="bo'+(sel?' selected':'')+extra+'" data-bopt="'+t.id+'_'+i+'">'+(i+1)+') '+escapeHtml(o)+'</div>';
+      html+='<div class="bo'+(sel?' selected':'')+extra+'" data-bopt="'+t.id+'_'+i+'">'+(i+1)+') '+inlineFmt(escapeHtml(o))+'</div>';
     });
     html+='</div>';
   } else {
@@ -1212,7 +1213,7 @@ function renderBtask(t){
     +(canEditBankTask()?'<button class="btn btn-sm bedit" data-task="'+t.id+'">✏️ Изменить</button>':'')+'</div>';
   if(st.status==="ok") html+='<div class="bt-status bt-state-ok">✅ Верно!</div>';
   else if(st.status==="wrong") html+='<div class="bt-status bt-state-bad">❌ Неверно</div>';
-  html+='<div class="bt-solution" id="bsol_'+t.id+'" style="display:'+(st.status==="ok"?"block":"none")+'"><b>Решение:</b> '+escapeHtml(t.solution||"")+'</div>';
+  html+='<div class="bt-solution" id="bsol_'+t.id+'" style="display:'+(st.status==="ok"?"block":"none")+'"><b>Решение:</b> '+renderConspectText(String(t.solution||"").replace(/<\/?[a-z][^>]*>/gi,""))+'</div>';
   html+='</div>';
   return html;
 }
