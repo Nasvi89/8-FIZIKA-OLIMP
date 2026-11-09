@@ -430,11 +430,13 @@ function renderModuleWorkspace(){
         +(mid==="session"?'<div class="subs-list" id="subs-wrap" data-mid="'+mid+'">':'<div class="subs-grid" id="subs-wrap" data-mid="'+mid+'">');
       subs.forEach(function(s,i){
         if(mid==="session"){
-          lh+='<div class="ticket-row" data-sub="'+i+'">'
-            +'<span class="tr-num">'+(i+1)+'</span>'
+          var pals=["#0e7ab8","#2f9e63","#e8890c","#e8503a","#7d5ba6","#1ba6e0","#c2417a","#4f6edb","#3aa873","#e07b2f","#b3432e","#8e4fd0","#2a9d8f","#d9534f"];
+          var col=pals[i%pals.length];
+          lh+='<div class="ticket-row" data-sub="'+i+'" style="border-left-color:'+col+'">'
+            +'<span class="tr-num" style="background:'+col+'">'+(i+1)+'</span>'
             +'<div class="tr-body"><div class="tr-name">'+escapeHtml(s.name)+'</div>'
             +(s.desc?'<div class="tr-desc">'+escapeHtml(s.desc)+'</div>':'')+'</div>'
-            +'<span class="tr-go">'+((s.tasks&&s.tasks.length)?s.tasks.length+' задач':'')+' →</span>'
+            +'<span class="tr-go" style="color:'+col+'">'+((s.tasks&&s.tasks.length)?s.tasks.length+' задач':'')+' →</span>'
             +'</div>';
         } else {
           lh+='<div class="sub-card" data-sub="'+i+'">'
@@ -2229,9 +2231,15 @@ function renderMakeTickets(cls, u){
       var h='<div class="tk-set"><h4>'+label+'</h4>';
       list.forEach(function(t,ti){
         h+='<div class="ckwork"><div class="tk-ticket-title">Билет '+t.num+':</div>'
-          +'<div class="tk-row"><span class="tk-idx">1.</span><span class="tk-txt">'+escapeHtml(t.topic.name)+'</span></div>';
+          +'<div class="tk-row"><span class="tk-idx">1.</span><div class="tk-txt">'+escapeHtml(t.topic.name)+'</div></div>';
         t.tasks.forEach(function(q,qi){
-          h+='<div class="tk-row"><span class="tk-idx">'+(qi+2)+'.</span><span class="tk-txt">'+escapeHtml(q.text)+'</span></div>';
+          h+='<div class="tk-row"><span class="tk-idx">'+(qi+2)+'.</span><div class="tk-txt">'+renderConspectText(String(q.text||"").replace(/<\/?[a-z][^>]*>/gi,""))+'</div></div>';
+          if(q.image){
+            var ims = Array.isArray(q.image)?q.image:[q.image];
+            ims.forEach(function(src){
+              h+='<div class="tk-row"><span class="tk-idx"></span><div class="tk-txt"><img src="'+escapeHtml(src)+'" style="max-width:100%;height:auto;border:1px solid var(--line);border-radius:6px" onerror="this.style.display=\'none\'"></div></div>';
+            });
+          }
         });
         h+='</div>';
       });
@@ -2258,6 +2266,8 @@ function renderMakeTickets(cls, u){
       set1.push({num:ti+1, topic:topic, tasks:t1});
       set2.push({num:ti+1, topic:topic, tasks:t2});
     });
+    set1.forEach(function(t){ t.tasks.sort(function(a,b){ return String(a.text||"").length - String(b.text||"").length; }); });
+    set2.forEach(function(t){ t.tasks.sort(function(a,b){ return String(a.text||"").length - String(b.text||"").length; }); });
     LAST_TICKETS={ set1:set1, set2:set2, clsName:cls?cls.name:"", from:sel[0].num, to:sel[sel.length-1].num };
     $("#tk-dl-pdf").disabled=false;
     renderOut(); toast("Составлено 2 комплекта по "+sel.length+" билетов");

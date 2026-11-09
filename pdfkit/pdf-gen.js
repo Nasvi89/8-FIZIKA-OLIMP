@@ -103,11 +103,21 @@ window.OLYMP_buildControlPdf=function(opts){
 };
 
 /* ============ PDF: билеты сессии (2 комплекта) ============ */
-// opts: { set1:[{topic:{name,body,desc},tasks:[{text,options?,answer?}]}], set2:[...], clsName, fileName }
+// opts: { set1:[{topic:{name,body,desc},tasks:[{text,options?,answer?,image?}]}], set2:[...], clsName, fileName }
 window.OLYMP_buildTicketsPdf=function(opts){
   return pdfDoc().then(function(ctx){
     var doc=ctx.doc, font=ctx.font, W=595.28, H=841.89, M=42, cw=W-2*M;
     var rgb=ctx.rgb, ink=rgb(0.12,0.15,0.28), inkSoft=rgb(0.32,0.36,0.55), accent=rgb(0.27,0.42,0.88), line=rgb(0.80,0.83,0.91), band=rgb(0.95,0.96,0.995), white=rgb(1,1,1);
+    // кэш загруженных картинок: srcKey -> {img,w,h}
+    var imgCache={};
+    function loadImage(src){
+      var key=src;
+      if(imgCache[key]) return Promise.resolve(imgCache[key]);
+      return fetch(src).then(function(res){ if(!res.ok) throw new Error("img "+res.status); return res.arrayBuffer(); })
+        .then(function(buf){ return doc.embedPng(new Uint8Array(buf)); })
+        .then(function(img){ var r={img:img,w:img.width,h:img.height}; imgCache[key]=r; return r; })
+        .catch(function(){ imgCache[key]={img:null,w:0,h:0}; return imgCache[key]; });
+    }
 
     function drawHeader(page, label, clsName){
       var y=H-40;
@@ -123,51 +133,96 @@ window.OLYMP_buildTicketsPdf=function(opts){
     }
 
     var page=null, y=0;
-    function addPage(){
-      page=doc.addPage(ctx.A4); y=H-56; return page;
+    function addPage(){ page=doc.addPage(ctx.A4); y=H-56; return page; }
+    // разбить "| a | b |" строки таблицы на массивы ячеек; вернуть {rows:[[...]], text:[...]}
+    function splitTable(text){
+      var lines=String(text).split("\n");
+      var rows=[], parts=[], inT=false;
+      lines.forEach(function(raw){
+        if(/^\s*\|/.test(raw)){
+          var cells=raw.split("|").slice(1,-1).map(function(c){return c.trim();});
+          var sig=cells.join("").replace(/[\s:|-]/g,"");
+          if(sig){ rows.push(cells); } // пропускаем |---|
+        } else { parts.push(raw); }
+      });
+      return { rows:rows, text:parts.join("\n").trim() };
     }
-    // вспомогательная: рисует один билет
+    // рисует один билет
     function drawTicket(t, num){
       var padded=num<10?("0"+num):String(num);
-      // заголовок билета
-      var titleH=12.5;
       if(y<60){ page=addPage(); }
       page.drawRectangle({x:M,y:y-3,width:cw,height:22,color:rgb(0.955,0.965,0.995)});
       page.drawLine({start:{x:M,y:y-3},end:{x:W-M,y:y-3},thickness:1.2,color:accent});
       page.drawText(esc("\u0411\u0438\u043b\u0435\u0442 "+padded),{x:M+8,y:y,size:12,color:accent,font:font});
       y-=24;
-      // пункты: 1) тема  2..n) задачи
-      var items=["1. "+t.topic.name];
-      (t.tasks||[]).forEach(function(q,i){ items.push(String(i+2)+". "+q.text); });
-      items.forEach(function(it, idx){
-        var bodyLines=wrapText(font,it,cw-14,9.5);
+      // пункт 1: тема (название)
+      var tl=wrapText(font,"1. "+t.topic.name,cw-14,9.5);
+      if(y<tl.length*12+50){ page=addPage(); }
+      tl.forEach(function(ln){ page.drawText(esc(ln),{x:M+7,y:y,size:9.5,color:ink,font:font}); y-=12; });
+      y-=6;
+      // задачи
+      (t.tasks||[]).forEach(function(q,qi){
+        var label=String(qi+2)+". ";
+        var st=splitTable(q.text||"");
+        var bodyLines=wrapText(font,label+st.text,cw-14,9.5);
         var optLines=[];
-        // варианты ответа, если есть — каждый на своей строке
-        var hasOpts = idx>0 && t.tasks[idx-1] && t.tasks[idx-1].options && t.tasks[idx-1].options.length;
-        if(hasOpts){
-          t.tasks[idx-1].options.forEach(function(o,i){ optLines=optLines.concat(wrapText(font,"  "+String(i+1)+") "+o, cw-24, 9)); });
-        }
-        var needed = 14 + bodyLines.length*12 + optLines.length*11 + 14;
+        if(q.options&&q.options.length){ q.options.forEach(function(o,i){ optLines=optLines.concat(wrapText(font,"  "+String(i+1)+") "+o,cw-24,9)); }); }
+        var imgH=0; var imgR=imgCache[String(q.image&&(Array.isArray(q.image)?q.image[0]:q.image))||""];
+        if(imgR&&imgR.img){ imgH=Math.min(200, (200*(imgR.h||1))/(imgR.w||1)); }
+        var needed = 14 + bodyLines.length*12 + optLines.length*11 + (st.rows.length? st.rows.length*13+8:0) + imgH + 14;
         if(y<needed+40){ page=addPage(); }
         bodyLines.forEach(function(ln){ page.drawText(esc(ln),{x:M+7,y:y,size:9.5,color:ink,font:font}); y-=12; });
-        y-=4;
-        optLines.forEach(function(ln){ page.drawText(esc(ln),{x:M+20,y:y,size:9,color:inkSoft,font:font}); y-=11; });
-        y-=2;
         y-=3;
+        // таблица
+        if(st.rows.length){
+          var colw=cw-14;
+          var rowH=13;
+          st.rows.forEach(function(r){
+            var x=M+12;
+            var cellw=colw/(r.length||1);
+            r.forEach(function(cell){
+              page.drawText(esc(cell),{x:x+2,y:y,size:8.5,color:ink,font:font});
+              page.drawLine({start:{x:x,y:y-3},end:{x:x+cellw,y:y-3},thickness:0.4,color:line});
+              page.drawLine({start:{x:x,y:y-3},end:{x:x,y:y-rowH},thickness:0.4,color:line});
+              x+=cellw;
+            });
+            page.drawLine({start:{x:M+12+colw,y:y-3},end:{x:M+12+colw,y:y-rowH},thickness:0.4,color:line});
+            page.drawLine({start:{x:M+12,y:y-rowH},end:{x:M+12+colw,y:y-rowH},thickness:0.4,color:line});
+            y-=rowH;
+          });
+          y-=5;
+        }
+        optLines.forEach(function(ln){ page.drawText(esc(ln),{x:M+20,y:y,size:9,color:inkSoft,font:font}); y-=11; });
+        y-=4;
+        // картинка
+        if(imgR&&imgR.img){
+          var drawW=Math.min(240, cw-14);
+          var drawH=drawW*(imgR.h)/(imgR.w||1);
+          if(drawH>220){ drawH=220; drawW=drawH*(imgR.w)/(imgR.h||1); }
+          if(y<drawH+30){ page=addPage(); }
+          page.drawImage(imgR.img,{x:M+10,y:y-drawH,width:drawW,height:drawH});
+          y-=drawH+10;
+        }
+        y-=4;
       });
       y-=8;
       page.drawLine({start:{x:M,y:y},end:{x:M+cw,y:y},thickness:0.4,color:line});
       y-=14;
     }
 
-    [[opts.set1,"Комплект 1"],[opts.set2,"Комплект 2"]].forEach(function(pair){
-      var list=pair[0], label=pair[1];
-      if(!list||!list.length) return;
-      addPage();
-      y=drawHeader(page, label, opts.clsName||"");
-      list.forEach(function(t,ti){ drawTicket(t, t.num||(ti+1)); });
+    // загружаем все картинки обеих комплектов перед отрисовкой
+    var loaders=[];
+    [opts.set1,opts.set2].forEach(function(list){ (list||[]).forEach(function(t){ (t.tasks||[]).forEach(function(q){ if(q.image){ var s=Array.isArray(q.image)?q.image[0]:q.image; loaders.push(loadImage(s)); } }); }); });
+    return Promise.all(loaders).then(function(){
+      [[opts.set1,"Комплект 1"],[opts.set2,"Комплект 2"]].forEach(function(pair){
+        var list=pair[0], label=pair[1];
+        if(!list||!list.length) return;
+        addPage();
+        y=drawHeader(page, label, opts.clsName||"");
+        list.forEach(function(t,ti){ drawTicket(t, t.num||(ti+1)); });
+      });
+      return doc;
     });
-    return doc;
   }).then(function(doc){ return doc.save(); })
     .then(function(bytes){ window.__downloadPdfBytes(bytes, opts.fileName||"Билеты_сессии.pdf"); });
 };
