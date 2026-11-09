@@ -1164,6 +1164,7 @@ function renderBank(){
   $("#statBase").textContent=tasks.filter(function(t){return t.level==="base";}).length;
   $("#statActive").textContent=tasks.filter(function(t){return t.level==="active";}).length;
   $("#statOlimp").textContent=tasks.filter(function(t){return t.level==="olimp";}).length;
+  var sse=$("#statSession"); if(sse) sse.textContent=tasks.filter(function(t){return t.level==="session";}).length;
   var sol=0; tasks.forEach(function(t){ if(P&&P.solvedTasks[extraStateKey(t.id)]&&P.solvedTasks[extraStateKey(t.id)].status==="ok") sol++; });
   $("#statSolved").textContent=sol;
   var list=$("#bank-list");
