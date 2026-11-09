@@ -151,28 +151,30 @@ window.OLYMP_buildTicketsPdf=function(opts){
     // если фрагмент не влезает (билет может занять 1-2 страницы, но никогда не обрезается и не ломается посреди задачи)
     function drawTicket(t, num){
       var padded=num<10?("0"+num):String(num);
-      var bottomLimit=H-56;
-      function needNew(h){ return y-h < bottomLimit; }
+      var bottomLimit=H-56;   // y на новой странице
+      var bottomMin=70;   // нижняя граница (не рисуем ниже неё)
+      // компактный режим: 2 билета на лист
+      var fontSize=9, lineH=10.5, optH=9.5, optSize=8.5;
+      function needNew(h){ return (y - h) < bottomMin; }
       // готовим фрагменты билета
       var pieces=[];
       pieces.push({ kind:"title", text:("Билет "+padded), lines:[] });
       // тема (пункт 1)
-      var tl=wrapText(font,"1. "+t.topic.name,cw-14,9.5);
-      tl.unshift(""); // пустой отступ перед темой? нет — просто строки
+      var tl=wrapText(font,"1. "+t.topic.name,cw-14,fontSize);
       pieces.push({ kind:"theme", lines:tl });
       // задачи
       (t.tasks||[]).forEach(function(q,qi){
         var label=String(qi+2)+". ";
         var st=splitTable(q.text||"");
-        var bodyLines=wrapText(font,label+st.text,cw-14,9.5);
+        var bodyLines=wrapText(font,label+st.text,cw-14,fontSize);
         if(!bodyLines.length) bodyLines=[""];
         var optLines=[];
-        if(q.options&&q.options.length){ q.options.forEach(function(o,i){ optLines=optLines.concat(wrapText(font,"  "+String(i+1)+") "+o,cw-24,9)); }); }
+        if(q.options&&q.options.length){ q.options.forEach(function(o,i){ optLines=optLines.concat(wrapText(font,"  "+String(i+1)+") "+o,cw-24,optSize)); }); }
         var imgR=imgCache[String(q.image&&(Array.isArray(q.image)?q.image[0]:q.image))||""];
         var drawW=0,drawH=0;
         if(imgR&&imgR.img){
-          drawW=Math.min(240,cw-14); drawH=drawW*(imgR.h)/(imgR.w||1);
-          if(drawH>220){ drawH=220; drawW=drawH*(imgR.w)/(imgR.h||1); }
+          drawW=Math.min(180,cw-14); drawH=drawW*(imgR.h)/(imgR.w||1);
+          if(drawH>150){ drawH=150; drawW=drawH*(imgR.w)/(imgR.h||1); }
         }
         pieces.push({ kind:"task", bodyLines:bodyLines, optLines:optLines, rows:st.rows, imgR:imgR, drawW:drawW, drawH:drawH });
       });
@@ -180,63 +182,63 @@ window.OLYMP_buildTicketsPdf=function(opts){
       // функция отрисовки одного фрагмента
       function drawPiece(p){
         if(p.kind==="title"){
-          if(needNew(26)) addPage();
-          page.drawRectangle({x:M,y:y-3,width:cw,height:22,color:rgb(0.955,0.965,0.995)});
-          page.drawLine({start:{x:M,y:y-3},end:{x:W-M,y:y-3},thickness:1.2,color:accent});
-          page.drawText(esc(p.text),{x:M+8,y:y,size:12,color:accent,font:font});
-          y-=26;
+          if(needNew(20)) addPage();
+          page.drawRectangle({x:M,y:y-2,width:cw,height:17,color:rgb(0.955,0.965,0.995)});
+          page.drawLine({start:{x:M,y:y-2},end:{x:W-M,y:y-2},thickness:1,color:accent});
+          page.drawText(esc(p.text),{x:M+8,y:y-1,size:10.5,color:accent,font:font});
+          y-=20;
           return;
         }
         if(p.kind==="theme"){
-          if(needNew(p.lines.length*12+20)) addPage();
-          p.lines.forEach(function(ln){ page.drawText(esc(ln),{x:M+7,y:y,size:9.5,color:ink,font:font}); y-=12; });
-          y-=8;
+          if(needNew(p.lines.length*lineH+14)) addPage();
+          p.lines.forEach(function(ln){ page.drawText(esc(ln),{x:M+7,y:y,size:fontSize,color:ink,font:font}); y-=lineH; });
+          y-=5;
           return;
         }
         if(p.kind==="task"){
           // высота фрагмента задачи
-          var h=10 + p.bodyLines.length*12 + p.optLines.length*11;
-          if(p.rows.length) h+=p.rows.length*13+6;
-          if(p.imgR&&p.imgR.img) h+=p.drawH+12;
-          h+=16;
+          var h=8 + p.bodyLines.length*lineH + p.optLines.length*optH;
+          if(p.rows.length) h+=p.rows.length*11+4;
+          if(p.imgR&&p.imgR.img) h+=p.drawH+8;
+          h+=10;
           if(needNew(h)) addPage();
-          p.bodyLines.forEach(function(ln){ page.drawText(esc(ln),{x:M+7,y:y,size:9.5,color:ink,font:font}); y-=12; });
-          y-=3;
+          p.bodyLines.forEach(function(ln){ page.drawText(esc(ln),{x:M+7,y:y,size:fontSize,color:ink,font:font}); y-=lineH; });
+          y-=2;
           if(p.rows.length){
-            var colw=cw-14, rowH=13;
+            var colw=cw-14, rowH=11;
             p.rows.forEach(function(r){
               var x=M+12;
               var cellw=colw/(r.length||1);
               r.forEach(function(cell){
-                page.drawText(esc(cell),{x:x+2,y:y,size:8.5,color:ink,font:font});
-                page.drawLine({start:{x:x,y:y-3},end:{x:x+cellw,y:y-3},thickness:0.4,color:line});
-                page.drawLine({start:{x:x,y:y-3},end:{x:x,y:y-rowH},thickness:0.4,color:line});
+                page.drawText(esc(cell),{x:x+2,y:y,size:8,color:ink,font:font});
+                page.drawLine({start:{x:x,y:y-2},end:{x:x+cellw,y:y-2},thickness:0.3,color:line});
+                page.drawLine({start:{x:x,y:y-2},end:{x:x,y:y-rowH},thickness:0.3,color:line});
                 x+=cellw;
               });
-              page.drawLine({start:{x:M+12+colw,y:y-3},end:{x:M+12+colw,y:y-rowH},thickness:0.4,color:line});
-              page.drawLine({start:{x:M+12,y:y-rowH},end:{x:M+12+colw,y:y-rowH},thickness:0.4,color:line});
+              page.drawLine({start:{x:M+12+colw,y:y-2},end:{x:M+12+colw,y:y-rowH},thickness:0.3,color:line});
+              page.drawLine({start:{x:M+12,y:y-rowH},end:{x:M+12+colw,y:y-rowH},thickness:0.3,color:line});
               y-=rowH;
             });
-            y-=5;
+            y-=4;
           }
-          p.optLines.forEach(function(ln){ page.drawText(esc(ln),{x:M+20,y:y,size:9,color:inkSoft,font:font}); y-=11; });
-          y-=4;
+          p.optLines.forEach(function(ln){ page.drawText(esc(ln),{x:M+20,y:y,size:optSize,color:inkSoft,font:font}); y-=optH; });
+          y-=3;
           if(p.imgR&&p.imgR.img){
             // подгоняем картинку под оставшееся место страницы целиком
-            var maxH=y-bottomLimit-8;
+            var maxH=y-bottomMin-6;
             var dH=p.drawH, dW=p.drawW;
-            if(dH>maxH && maxH>30){ dH=maxH; dW=dH*(p.imgR.w)/(p.imgR.h||1); }
+            if(dH>maxH && maxH>25){ dH=maxH; dW=dH*(p.imgR.w)/(p.imgR.h||1); }
             page.drawImage(p.imgR.img,{x:M+10,y:y-dH,width:dW,height:dH});
-            y-=dH+10;
+            y-=dH+8;
           }
-          y-=4;
+          y-=3;
         }
       }
 
       // рисуем все фрагменты по порядку
       pieces.forEach(drawPiece);
       // разделитель билета
-      if(y<H-20){ page.drawLine({start:{x:M,y:y-4},end:{x:M+cw,y:y-4},thickness:0.4,color:line}); y-=12; }
+      if(y<H-20){ page.drawLine({start:{x:M,y:y-3},end:{x:M+cw,y:y-3},thickness:0.4,color:line}); y-=9; }
     }
 
     // загружаем все картинки обеих комплектов перед отрисовкой
