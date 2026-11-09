@@ -148,12 +148,12 @@ window.OLYMP_buildTicketsPdf=function(opts){
       return { rows:rows, text:parts.join("\n").trim() };
     }
     // высота фрагмента (в точности соответствует тому, сколько y отнимает drawPiece)
-    function pieceHeight(p){
+    function pieceHeight(p, fs, lh, oh){
       if(p.kind==="title") return 20;
-      if(p.kind==="theme") return p.lines.length*lineH + 5;
-      var h=2 + p.bodyLines.length*lineH + 2;
+      if(p.kind==="theme") return p.lines.length*lh + 5;
+      var h=2 + p.bodyLines.length*lh + 2;
       if(p.rows.length) h+=p.rows.length*11+4;
-      h+=p.optLines.length*optH + 3;
+      h+=p.optLines.length*oh + 3;
       if(p.imgR&&p.imgR.img) h+=p.drawH+8;
       h+=3;
       return h;
@@ -161,46 +161,72 @@ window.OLYMP_buildTicketsPdf=function(opts){
 
     // рисует один билет: тема + задачи.
     // ВАЖНО: билет не может разрываться — если он целиком не помещается на остатке
-    // листа, весь билет переносится на новую страницу ДО отрисовки.
+    // листа, весь билет переносится на новую страницу ДО отрисовки. Если билет выше
+    // целой страницы — плавно сжимаем шрифт/интервалы, чтобы не обрезать задачи.
     function drawTicket(t, num){
       var padded=num<10?("0"+num):String(num);
-      var bottomLimit=H-56;   // y на новой странице
       var bottomMin=70;   // нижняя граница (не рисуем ниже неё)
-      // компактный режим: 2 билета на лист
-      var fontSize=9, lineH=10.5, optH=9.5, optSize=8.5;
       function needNew(h){ return (y - h) < bottomMin; }
       // готовим фрагменты билета
       var pieces=[];
       pieces.push({ kind:"title", text:("Билет "+padded), lines:[] });
-      // тема (пункт 1)
-      var tl=wrapText(font,"1. "+t.topic.name,cw-14,fontSize);
-      pieces.push({ kind:"theme", lines:tl });
-      // задачи
-      (t.tasks||[]).forEach(function(q,qi){
-        var label=String(qi+2)+". ";
-        var st=splitTable(q.text||"");
-        var bodyLines=wrapText(font,label+st.text,cw-14,fontSize);
-        if(!bodyLines.length) bodyLines=[""];
-        var optLines=[];
-        if(q.options&&q.options.length){ q.options.forEach(function(o,i){ optLines=optLines.concat(wrapText(font,"  "+String(i+1)+") "+o,cw-24,optSize)); }); }
-        var imgR=imgCache[String(q.image&&(Array.isArray(q.image)?q.image[0]:q.image))||""];
-        var drawW=0,drawH=0;
-        if(imgR&&imgR.img){
-          drawW=Math.min(180,cw-14); drawH=drawW*(imgR.h)/(imgR.w||1);
-          if(drawH>150){ drawH=150; drawW=drawH*(imgR.w)/(imgR.h||1); }
-        }
-        pieces.push({ kind:"task", bodyLines:bodyLines, optLines:optLines, rows:st.rows, imgR:imgR, drawW:drawW, drawH:drawH });
-      });
-      // полная высота всего билета (вместе с разделителем)
-      var totalH=9;
-      pieces.forEach(function(p){ totalH+=pieceHeight(p); });
+
+      // полная высота билета при данных размерах
+      function totalHeight(fs, lh, oh){
+        var h=9;
+        pieces.forEach(function(p){ h+=pieceHeight(p, fs, lh, oh); });
+        return h;
+      }
+
+      function buildPieces(fs, lh, oh, os){
+        pieces=[];
+        pieces.push({ kind:"title", text:("Билет "+padded), lines:[] });
+        // тема (пункт 1)
+        var tl=wrapText(font,"1. "+t.topic.name,cw-14,fs);
+        pieces.push({ kind:"theme", lines:tl });
+        // задачи
+        (t.tasks||[]).forEach(function(q,qi){
+          var label=String(qi+2)+". ";
+          var st=splitTable(q.text||"");
+          var bodyLines=wrapText(font,label+st.text,cw-14,fs);
+          if(!bodyLines.length) bodyLines=[""];
+          var optLines=[];
+          if(q.options&&q.options.length){ q.options.forEach(function(o,i){ optLines=optLines.concat(wrapText(font,"  "+String(i+1)+") "+o,cw-24,os)); }); }
+          var imgR=imgCache[String(q.image&&(Array.isArray(q.image)?q.image[0]:q.image))||""];
+          var drawW=0,drawH=0;
+          if(imgR&&imgR.img){
+            drawW=Math.min(180,cw-14); drawH=drawW*(imgR.h)/(imgR.w||1);
+            if(drawH>150){ drawH=150; drawW=drawH*(imgR.w)/(imgR.h||1); }
+          }
+          pieces.push({ kind:"task", bodyLines:bodyLines, optLines:optLines, rows:st.rows, imgR:imgR, drawW:drawW, drawH:drawH });
+        });
+      }
+
+      // подобрать размеры так, чтобы билет влез на одну страницу
+      var fontSize=9, lineH=10.5, optH=9.5, optSize=8.5;
+      buildPieces(fontSize, lineH, optH, optSize);
+      var totalH=totalHeight(fontSize, lineH, optH);
+      var usable=(y-bottomMin); // место на текущей странице
+      // если билет заранее больше целой страницы — сжимаем
+      var pageUsable=(H-56)-bottomMin; // высота целой страницы для размещения
+      if(totalH > pageUsable){
+        var scale=pageUsable/totalH;
+        scale=Math.max(0.72, Math.min(1, scale));
+        fontSize=Math.max(7, fontSize*scale);
+        lineH=fontSize*1.15;
+        optH=fontSize*1.02;
+        optSize=Math.max(6.5, optSize*scale);
+        buildPieces(fontSize, lineH, optH, optSize);
+        totalH=totalHeight(fontSize, lineH, optH);
+        // корректируем cellH не нужно — таблицы уже по данным
+      }
 
       // функция отрисовки одного фрагмента
       function drawPiece(p){
         if(p.kind==="title"){
           page.drawRectangle({x:M,y:y-2,width:cw,height:17,color:rgb(0.955,0.965,0.995)});
           page.drawLine({start:{x:M,y:y-2},end:{x:W-M,y:y-2},thickness:1,color:accent});
-          page.drawText(esc(p.text),{x:M+8,y:y-1,size:10.5,color:accent,font:font});
+          page.drawText(esc(p.text),{x:M+8,y:y-1,size:fontSize+1.5,color:accent,font:font});
           y-=20;
           return;
         }
@@ -218,7 +244,7 @@ window.OLYMP_buildTicketsPdf=function(opts){
               var x=M+12;
               var cellw=colw/(r.length||1);
               r.forEach(function(cell){
-                page.drawText(esc(cell),{x:x+2,y:y,size:8,color:ink,font:font});
+                page.drawText(esc(cell),{x:x+2,y:y,size:fontSize-1,color:ink,font:font});
                 page.drawLine({start:{x:x,y:y-2},end:{x:x+cellw,y:y-2},thickness:0.3,color:line});
                 page.drawLine({start:{x:x,y:y-2},end:{x:x,y:y-rowH},thickness:0.3,color:line});
                 x+=cellw;
@@ -242,9 +268,7 @@ window.OLYMP_buildTicketsPdf=function(opts){
         }
       }
 
-      // если весь билет не помещается на остатке листа — переходим на новую страницу.
-      // Страховка: если билет настолько высок, что не влезает даже на чистой странице,
-      // второй раз не переносим (иначе бесконечный цикл); картинки там и так сжимаются.
+      // если весь билет не помещается на остатке листа — переходим на новую страницу
       if(needNew(totalH)) addPage();
       // рисуем все фрагменты по порядку (билет гарантированно помещается целиком)
       pieces.forEach(drawPiece);
