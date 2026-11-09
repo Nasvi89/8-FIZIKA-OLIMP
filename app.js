@@ -264,9 +264,10 @@ function moduleExhausted(moduleId){
   return (P.modStat[moduleId].badSubmits||0)>=3 || !!P.modStat[moduleId].revealed;
 }
 function masterProg(moduleId){ return moduleMasteryPct(moduleId); }
-function moduleCompletedCount(){ if(!P) return 0; return OLYMP_MODULES.filter(function(m){return moduleMasteryPct(m.id)>=100;}).length; }
-// Доступ к олимпиаде: только когда пройдены все модули (финальный открыт)
-function olympiadAllowed(){ return OLYMP_MODULES.every(function(m){return moduleMasteryPct(m.id)>=100;}); }
+function moduleCompletedCount(){ if(!P) return 0; return OLYMP_MODULES.filter(function(m){return !m.pinned&&moduleMasteryPct(m.id)>=100;}).length; }
+function nonPinnedModules(){ return OLYMP_MODULES.filter(function(m){return !m.pinned;}); }
+// Доступ к олимпиаде: только когда пройдены все (незакреплённые) модули (финальный открыт)
+function olympiadAllowed(){ return nonPinnedModules().every(function(m){return moduleMasteryPct(m.id)>=100;}); }
 
 /* ---------- Очки навыков ---------- */
 function skillGains(task){
@@ -356,7 +357,27 @@ function renderModuleGrid(){
   var wrap=$("#module-grid"); if(!wrap) return;
   if(!currentUser()){ wrap.innerHTML='<div class="empty"><span class="big">🔐</span>Войди в аккаунт, чтобы проходить блоки.</div>'; return; }
   var html='<div class="module-grid">';
+  var pinned=OLYMP_MODULES.filter(function(m){return m.pinned;});
+  if(pinned.length){
+    html+='<div class="pinned-wrap"><div class="pinned-label">🔒 Закреплён · открыт всем</div><div class="module-grid pinned-grid">';
+    pinned.forEach(function(m){
+      var unlocked=true, prog=masterProg(m.id), complete=prog>=100;
+      var ms=P.modStat[m.id];
+      var state=complete?'<span class="mt-state" style="color:var(--good)">✓ зачтён</span>':'<span class="mt-state" style="color:var(--electro)">доступен</span>';
+      var lvl='<div class="mt-lvl-badges">'+OLYMP_LEVELS.map(function(l){return '<span style="background:'+l.color+'">'+l.name+'</span>';}).join("")+'</div>';
+      var cls='mod-tile available pinned-tile'+(currentModuleId===m.id?' active-now':'');
+      html+='<div class="'+cls+'" style="border-top-color:'+m.color+'" data-mod="'+m.id+'">'
+        +'<div class="mt-top"><span class="mt-no">Блок '+m.no+'</span><span class="mt-icon">'+m.icon+'</span></div>'
+        +'<h3>'+m.name+'</h3><div class="mt-desc">'+m.desc+'</div>'+lvl
+        +'<div class="mt-prog"><span class="mt-bar"><i style="width:'+prog+'%"></i></span><span>'+prog+'%</span></div>'
+        +'<div class="mt-top"><span class="mt-state">'+state+'</span></div>'
+        +'<button class="btn btn-primary btn-sm mt-action">'+(complete?'Повторить':'Начать')+' →</button>'
+        +'</div>';
+    });
+    html+='</div></div>';
+  }
   OLYMP_MODULES.forEach(function(m){
+    if(m.pinned) return;
     var unlocked=moduleUnlocked(m.id), prog=masterProg(m.id), complete=prog>=100;
     var ms=P.modStat[m.id];
     var exhausted=moduleExhausted(m.id);
@@ -1076,7 +1097,7 @@ function renderDashboard(){
   $("#dash-xp").textContent=xp;
   var tl=trackLevelInfo();
   $("#dash-lvl").textContent=user?(tl.level+" · "+tl.name):"—";
-  $("#dash-modules").textContent=user?(moduleCompletedCount()+"/"+OLYMP_MODULES.length):"—";
+  $("#dash-modules").textContent=user?(moduleCompletedCount()+"/"+nonPinnedModules().length):"—";
   var achCount=user?OLYMP_ACHIEVEMENTS.filter(function(a){return P.achievementsOpen[a.id];}).length:0;
   $("#dash-ach").textContent=user?achCount:"—";
   renderMinimap();
@@ -1125,7 +1146,11 @@ function fillBankModuleFilter(){ var sel=$("#bank-module-filter"); if(!sel) retu
   var cur=bankModuleFilter; sel.innerHTML=""; var a=document.createElement("option"); a.value="all"; a.textContent="Все темы"; sel.appendChild(a);
   OLYMP_MODULES.forEach(function(m){ var o=document.createElement("option"); o.value=m.id; o.textContent=m.no+". "+m.short; sel.appendChild(o); if(m.id===cur)o.selected=true; });
 }
-function extraTasks(){ return (typeof OLYMP_EXTRA_TASKS!=="undefined"&&OLYMP_EXTRA_TASKS.length?OLYMP_EXTRA_TASKS:[]).concat(P&&P.customBank?P.customBank:[]); }
+function extraTasks(){
+  var list=(typeof OLYMP_EXTRA_TASKS!=="undefined"&&OLYMP_EXTRA_TASKS.length?OLYMP_EXTRA_TASKS:[]);
+  if(typeof OLYMP_SESSION_TASKS!=="undefined"&&OLYMP_SESSION_TASKS.length) list=list.concat(OLYMP_SESSION_TASKS);
+  return list.concat(P&&P.customBank?P.customBank:[]);
+}
 function extraStateKey(id){ return "x_"+id; }
 function renderBank(){
   var tasks=extraTasks();
@@ -1156,6 +1181,10 @@ function renderBtask(t){
     +'<span class="level-badge" style="background:'+olympLvlColor(t.level)+'">'+olympLvlName(t.level)+'</span>'
     +'<span class="type-tag">'+((OLYMP_TYPES.filter(function(x){return x.id===t.type;})[0]||{}).name||t.type)+'</span></div>'
     +'<div class="bt-q">'+escapeHtml(t.text)+'</div>';
+  var images = t.image ? (Array.isArray(t.image)?t.image:[t.image]) : [];
+  images.forEach(function(src){
+    html+='<div class="bt-img"><img src="'+escapeHtml(src)+'" style="max-width:100%;height:auto" onerror="this.style.display=\'none\'"></div>';
+  });
   var locked = st.status==="ok";
   if(t.type==="test"){
     html+='<div class="bt-opts">';
@@ -1323,7 +1352,7 @@ function renderProfile(){
     +'<div class="stats-grid">'
     +'<div class="stat-cell"><b>'+P.xp+'</b><span>XP</span></div>'
     +'<div class="stat-cell"><b>'+trackLevelInfo().level+'</b><span>уровень</span></div>'
-    +'<div class="stat-cell"><b>'+moduleCompletedCount()+'/'+OLYMP_MODULES.length+'</b><span>блоков</span></div>'
+    +'<div class="stat-cell"><b>'+moduleCompletedCount()+'/'+nonPinnedModules().length+'</b><span>блоков</span></div>'
     +'<div class="stat-cell"><b>'+P.correctTotal+'</b><span>решено верно</span></div>'
     +'<div class="stat-cell"><b>'+P.bestStreak+'</b><span>лучшая серия</span></div>'
     +'<div class="stat-cell"><b>'+OLYMP_ACHIEVEMENTS.filter(function(a){return P.achievementsOpen[a.id];}).length+'</b><span>достижений</span></div>'
@@ -1873,6 +1902,9 @@ function renderClassKR(cls, u){
     +'<div class="sub-card cl-tab-card cl-kr-card'+(cur==="make"?' active':'')+'" data-krtab="make">'
     +'<div class="sc-top"><span class="sc-icon">🔀</span></div>'
     +'<h3 class="sc-name">Составить КР</h3><div class="sc-desc">2 равносильных варианта из банка</div></div>'
+    +'<div class="sub-card cl-tab-card cl-kr-card'+(cur==="tickets"?' active':'')+'" data-krtab="tickets">'
+    +'<div class="sc-top"><span class="sc-icon">🎫</span></div>'
+    +'<h3 class="sc-name">Билеты</h3><div class="sc-desc">Теория по билету + 2 задачи сессии</div></div>'
     +'</div>';
   html+='<div id="cl-kr-content"></div>';
   box.innerHTML=html;
@@ -1880,6 +1912,7 @@ function renderClassKR(cls, u){
     c.addEventListener("click",function(){ window.__clKr=c.getAttribute("data-krtab"); renderClassKR(cls,u); });
   });
   if(cur==="make") renderMakeKR(cls,u);
+  else if(cur==="tickets") renderMakeTickets(cls,u);
   else renderClassKRBank(cls,u);
 }
 
@@ -2067,6 +2100,102 @@ function renderMakeKR(cls, u){
       V.A.concat(V.B).concat(V.C).forEach(function(t){ num++; win.document.write('<div class="q">'+num+'. '+escapeHtml(t.text)+(t.options?'<br><span class="s">'+t.options.map(function(o,i){return (i+1)+') '+escapeHtml(o);}).join(" · ")+'</span>':"")+'</div>'); });
       win.document.write('</div>');
     });
+    win.document.write('</body></html>');
+    win.document.close(); win.focus(); win.print();
+  });
+}
+
+/* ---------- Билеты сессии (теория + 2 задачи) ---------- */
+// Показывает подтемы блока «Зимняя сессия» как базу для билетов
+function sessionTopics(){
+  if(typeof OLYMP_LESSONS==="undefined"||!OLYMP_LESSONS.session||!OLYMP_LESSONS.session.subs) return [];
+  return OLYMP_LESSONS.session.subs.map(function(s){ return { name:s.name, body:s.body, desc:s.desc }; });
+}
+function sessionBankTasks(){
+  if(typeof OLYMP_SESSION_TASKS!=="undefined"&&OLYMP_SESSION_TASKS.length) return OLYMP_SESSION_TASKS;
+  return [];
+}
+var LAST_TICKET=null; // { topic:{name,body}, tasks:[...], clsName }
+function renderMakeTickets(cls, u){
+  var box=$("#cl-kr-content"); if(!box) return;
+  var topics=sessionTopics();
+  var data=sessionBankTasks();
+  var html='<div class="panel"><div class="view-head-row"><div class="view-head"><h3>🎫 Составить билет</h3>'
+    +'<p class="muted" style="font-size:12.5px">Билет = теория по выбранной теме сессии + случайные задачи ОГЭ из банка сессии (теория + 2 задачи).</p></div></div>';
+  if(!topics.length){
+    html+='<div class="empty"><span class="big">📭</span>Подтемы сессии не найдены (нет данных lessons).</div></div>';
+    box.innerHTML=html; return;
+  }
+  html+='<div class="control-actions">'
+    +'<span class="fsep">Тема билета:</span>'
+    +'<select id="tk-topic" class="filter-select" style="min-width:260px">'
+    +topics.map(function(s,i){ return '<option value="'+i+'">'+(i+1)+'. '+escapeHtml(s.name)+'</option>'; }).join("")
+    +'</select>'
+    +'<span class="fsep">Задач:</span>'
+    +'<select id="tk-count" class="filter-select"><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option></select>'
+    +'<button class="btn btn-primary" id="tk-gen">Составить билет</button>'
+    +'<button class="btn" id="tk-dl-txt" disabled>Скачать txt</button>'
+    +'<button class="btn" id="tk-dl-pdf" disabled>Скачать PDF</button>'
+    +'<button class="btn" id="tk-print" disabled>Печать</button></div>';
+  html+='<div id="tk-output" class="control-output"></div></div>';
+  box.innerHTML=html;
+
+  function renderOut(){
+    var out=$("#tk-output");
+    if(!LAST_TICKET){ out.innerHTML='<div class="empty"><span class="big">🎫</span>Выберите тему и нажмите «Составить билет».</div>'; return; }
+    var T=LAST_TICKET;
+    var h='<div class="ckwork"><h3>Билет: '+escapeHtml(T.topic.name)+'</h3><div class="ck-sub">'+escapeHtml((T.topic.desc||""))+' · теория + '+T.tasks.length+' задач</div>';
+    h+='<div class="ticket-theory"><h4>📖 Теория</h4><div class="tk-body">'+renderConspectText(T.topic.body)+'</div></div>';
+    h+='<div class="ticket-tasks"><h4>✏️ Задачи</h4>';
+    T.tasks.forEach(function(t,i){
+      h+='<div class="ck-q"><div class="qpts">Задача '+(i+1)+' · сессия</div><div class="qtext">'+escapeHtml(t.text)+'</div>'
+        +'<div class="qsol"><b>Ответ:</b> '+escapeHtml(t.answer||"")+'</div></div>';
+    });
+    h+='</div></div>';
+    out.innerHTML=h;
+    applyMath(out);
+  }
+  renderOut();
+
+  $("#tk-gen").addEventListener("click",function(){
+    var idx=parseInt($("#tk-topic").value,10);
+    var cnt=parseInt($("#tk-count").value,10);
+    var topic=topics[idx]||topics[0];
+    var pool=data.slice();
+    if(!pool.length){ toast("Банк сессии пуст — нет задач"); return; }
+    var picked=shuffle(pool).slice(0,Math.min(cnt,pool.length));
+    LAST_TICKET={ topic:topic, tasks:picked, clsName:cls?cls.name:"" };
+    $("#tk-dl-txt").disabled=false; $("#tk-dl-pdf").disabled=false; $("#tk-print").disabled=false;
+    renderOut(); toast("Билет составлен: теория + "+picked.length+" задач");
+  });
+  $("#tk-dl-txt").addEventListener("click",function(){
+    if(!LAST_TICKET) return;
+    var T=LAST_TICKET;
+    var lines=["БИЛЕТ ПО ФИЗИКЕ · 8 КЛАСС · ЗИМНЯЯ СЕССИЯ","Тема: "+T.topic.name,"","ТЕОРИЯ:"];
+    if(T.topic.body) lines.push(String(T.topic.body).replace(/\$\$.*?\$\$/g,"").replace(/[*#:>]/g,""));
+    lines.push("","ЗАДАЧИ:");
+    T.tasks.forEach(function(t,i){ lines.push((i+1)+". "+t.text+(t.answer?"  → "+t.answer:"")); lines.push(""); });
+    downloadText("Билет_"+safeName(cls?cls.name:"")+"_"+safeName(T.topic.name)+".txt", lines.join("\n"));
+  });
+  $("#tk-dl-pdf").addEventListener("click",function(){
+    if(!LAST_TICKET){ toast("Сначала составь билет"); return; }
+    if(typeof window.OLYMP_buildControlPdf!=="function"){ toast("Генератор PDF не загружен"); return; }
+    var T=LAST_TICKET;
+    var one={ A:T.tasks.slice(0,Math.ceil(T.tasks.length/2)), B:T.tasks.slice(Math.ceil(T.tasks.length/2)), C:[] };
+    var theme="Билет: "+T.topic.name+" · класс "+(cls?cls.name:"");
+    window.OLYMP_buildControlPdf({ v1:one, v2:{A:[],B:[],C:[]}, theme:theme, fileName:"Билет_"+safeName(T.topic.name)+".pdf" });
+  });
+  $("#tk-print").addEventListener("click",function(){
+    if(!LAST_TICKET){ toast("Сначала составь билет"); return; }
+    var T=LAST_TICKET;
+    var win=window.open("","_blank","width=900,height=700");
+    win.document.write('<html><head><title>Билет</title><style>body{font-family:Georgia,serif;padding:24px;color:#111}h2{text-align:center}.th{border:1px solid #ccc;padding:12px;margin:10px 0}.ts{background:#f5f8fc;padding:12px;margin:10px 0}.q{margin:10px 0}.s{font-size:12px;color:#555}</style></head><body>');
+    win.document.write('<h2>Билет по физике · 8 класс · Зимняя сессия</h2>');
+    win.document.write('<h3>Тема: '+escapeHtml(T.topic.name)+'</h3>');
+    win.document.write('<div class="th"><b>Теория:</b><br>'+escapeHtml(String(T.topic.body||"").replace(/[*#:>]/g,""))+'</div>');
+    win.document.write('<div class="ts"><b>Задачи:</b>');
+    T.tasks.forEach(function(t,i){ win.document.write('<div class="q">'+(i+1)+'. '+escapeHtml(t.text)+'</div>'); });
+    win.document.write('</div>');
     win.document.write('</body></html>');
     win.document.close(); win.focus(); win.print();
   });
